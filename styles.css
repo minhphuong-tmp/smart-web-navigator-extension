@@ -317,9 +317,9 @@ html:not([dark]) .smart-nav-watch-copy-btn:hover {
    -------------------------------------------------------------------------- */
 .smart-nav-fb-copy-btn {
   position: absolute !important;
-  top: 10px !important;
-  left: 10px !important;
-  z-index: 2147483640 !important;
+  top: 12px !important;
+  left: 12px !important;
+  z-index: 2147483647 !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;

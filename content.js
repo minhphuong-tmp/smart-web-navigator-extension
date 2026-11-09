@@ -715,7 +715,7 @@
       trackingParams.forEach(p => url.searchParams.delete(p));
 
       // 1. Dạng Facebook Reel (/reel/123456789)
-      const reelMatch = url.pathname.match(/\/reel\/(\d+)/);
+      const reelMatch = url.pathname.match(/\/reel\/([0-9a-zA-Z_-]+)/);
       if (reelMatch) {
         return `https://www.facebook.com/reel/${reelMatch[1]}`;
       }
@@ -723,21 +723,30 @@
       // 2. Dạng Facebook Watch (/watch/?v=123456789)
       if (url.searchParams.has('v')) {
         const v = url.searchParams.get('v');
-        if (v && /^\d+$/.test(v)) {
+        if (v) {
           return `https://www.facebook.com/watch/?v=${v}`;
         }
       }
 
       // 3. Dạng Profile / Page Videos (/username/videos/123456789/)
-      const videoMatch = url.pathname.match(/\/videos\/(\d+)/);
+      const videoMatch = url.pathname.match(/\/videos\/([0-9a-zA-Z_-]+)/);
       if (videoMatch) {
         return `https://www.facebook.com/watch/?v=${videoMatch[1]}`;
       }
 
-      // 4. Dạng Posts có chứa ID bài viết (/username/posts/123456789)
-      const postMatch = url.pathname.match(/\/posts\/(\d+)/);
+      // 4. Dạng Posts (/username/posts/pfbid... hoặc /username/posts/12345)
+      const postMatch = url.pathname.match(/\/posts\/([0-9a-zA-Z_-]+)/);
       if (postMatch) {
-        return `https://www.facebook.com/watch/?v=${postMatch[1]}`;
+        return `https://www.facebook.com${url.pathname}`;
+      }
+
+      // 5. Dạng permalink.php?story_fbid=...&id=...
+      if (url.pathname.includes('permalink.php') && url.searchParams.has('story_fbid')) {
+        let clean = `https://www.facebook.com/permalink.php?story_fbid=${url.searchParams.get('story_fbid')}`;
+        if (url.searchParams.has('id')) {
+          clean += `&id=${url.searchParams.get('id')}`;
+        }
+        return clean;
       }
 
       return url.origin + url.pathname + (url.search ? url.search : '');
@@ -747,49 +756,60 @@
   }
 
   /**
-   * TÌM LINK GỐC CỦA VIDEO TRÊN FACEBOOK TỪ THẺ VIDEO VÀ CONTAINER
+   * TÌM LINK GỐC CỦA VIDEO TRÊN FACEBOOK TỪ THẺ VIDEO VÀ ANCESTOR DOM
    */
-  function findFacebookVideoUrl(videoEl, container) {
+  function findFacebookVideoUrl(videoEl) {
     // 1. Nếu người dùng đang mở trang Reel hoặc Watch trực tiếp
-    if (window.location.pathname.startsWith('/reel/')) {
+    if (window.location.pathname.startsWith('/reel')) {
       return getCleanFacebookUrl(window.location.href);
     }
     if (window.location.pathname.startsWith('/watch')) {
       return getCleanFacebookUrl(window.location.href);
     }
 
-    if (!container) {
-      container = videoEl.closest('div[role="feed"] > div, div[role="article"], div[data-pagelet*="FeedUnit"], div[data-pagelet*="Reels"], div[role="dialog"]') || videoEl.parentElement;
-    }
+    // 2. Duyệt ngược lên các thẻ cha (tối đa 15 cấp) để tìm thẻ chứa link bài viết hoặc video
+    let curr = videoEl;
+    let maxSteps = 15;
+    while (curr && curr !== document.body && maxSteps > 0) {
+      maxSteps--;
 
-    if (container) {
-      // 2. Tìm thẻ <a> chứa link Reel hoặc Watch hoặc Videos
-      const directVideoLink = container.querySelector(
+      // Ưu tiên 1: Link trực tiếp tới Reel hoặc Video hoặc Watch
+      const direct = curr.querySelector(
         'a[href*="/reel/"], a[href*="/videos/"], a[href*="/watch?v="], a[href*="/watch/?v="]'
       );
-      if (directVideoLink && directVideoLink.href) {
-        return getCleanFacebookUrl(directVideoLink.href);
+      if (direct && direct.href) {
+        return getCleanFacebookUrl(direct.href);
       }
 
-      // 3. Tìm thẻ <a> timestamp permalink (ngày giờ đăng bài)
-      const permalink = container.querySelector(
-        'a[href*="/posts/"], a[href*="/permalink/"], a[href*="story_fbid="], a[aria-label*="giờ"], a[aria-label*="phút"], a[aria-label*="ngày"], a[aria-label*="ago"], a[aria-label*="min"], a[aria-label*="hour"]'
+      // Ưu tiên 2: Link bài viết (posts, permalink, story_fbid)
+      const postLink = curr.querySelector(
+        'a[href*="/posts/"], a[href*="/permalink/"], a[href*="permalink.php"], a[href*="story.php"], a[href*="story_fbid="]'
       );
-      if (permalink && permalink.href) {
-        return getCleanFacebookUrl(permalink.href);
+      if (postLink && postLink.href) {
+        return getCleanFacebookUrl(postLink.href);
       }
 
-      // 4. Tìm bất kỳ link nào có ID số trong pathname
-      const allLinks = container.querySelectorAll('a[href]');
-      for (const a of allLinks) {
-        const h = a.href;
-        if (h && (h.includes('/reel/') || h.includes('/watch') || h.includes('/videos/') || h.includes('/posts/'))) {
-          return getCleanFacebookUrl(h);
-        }
+      // Ưu tiên 3: Link timestamp (ngày/giờ đăng)
+      const timeLink = curr.querySelector(
+        'a[aria-label*="giờ"], a[aria-label*="phút"], a[aria-label*="ngày"], a[aria-label*="ago"], a[aria-label*="hour"], a[aria-label*="min"], a[aria-label*="yesterday"]'
+      );
+      if (timeLink && timeLink.href) {
+        return getCleanFacebookUrl(timeLink.href);
+      }
+
+      curr = curr.parentElement;
+    }
+
+    // 3. Quét toàn bộ các link <a> trong post/dialog gần nhất
+    const root = videoEl.closest('div[role="article"], div[role="dialog"], [data-pagelet*="FeedUnit"], div[role="main"]') || document;
+    const candidates = root.querySelectorAll('a[href]');
+    for (const a of candidates) {
+      const h = a.href || '';
+      if (h.includes('/reel/') || h.includes('/videos/') || h.includes('/watch') || h.includes('/posts/') || h.includes('story_fbid=')) {
+        return getCleanFacebookUrl(h);
       }
     }
 
-    // Fallback: URL hiện tại
     return getCleanFacebookUrl(window.location.href);
   }
 
@@ -814,25 +834,18 @@
       <span class="smart-nav-fb-btn-label">Copy clip</span>
     `;
 
-    // Chặn sự kiện chuột để Facebook không tạm dừng video hay chuyển trang khi bấm nút
-    ['mousedown', 'mouseup', 'pointerdown', 'touchstart'].forEach(evtType => {
-      btn.addEventListener(evtType, (e) => {
-        e.preventDefault();
+    let isCopying = false;
+    async function doCopy(e) {
+      if (e) {
         e.stopPropagation();
         e.stopImmediatePropagation();
-      }, true);
-    });
+        if (e.preventDefault) e.preventDefault();
+      }
+      if (isCopying) return;
+      isCopying = true;
+      setTimeout(() => { isCopying = false; }, 800);
 
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-
-      const container = videoEl.closest(
-        'div[role="feed"] > div, div[role="article"], div[data-pagelet*="FeedUnit"], div[data-pagelet*="Reels"], div[role="dialog"]'
-      ) || videoEl.parentElement;
-
-      const rawUrl = findFacebookVideoUrl(videoEl, container);
+      const rawUrl = findFacebookVideoUrl(videoEl);
       if (!rawUrl) {
         showToast('⚠️ Không tìm thấy link clip Facebook để copy');
         return;
@@ -862,7 +875,18 @@
       } else {
         showToast('⚠️ Không thể copy link vào clipboard');
       }
-    }, true);
+    }
+
+    // Chỉ chặn propagation để video Facebook không bị pause/nhảy trang, KHÔNG preventDefault mousedown!
+    ['pointerdown', 'mousedown', 'mouseup'].forEach(evtType => {
+      btn.addEventListener(evtType, (e) => {
+        e.stopPropagation();
+      });
+    });
+
+    // Lắng nghe cả click và pointerup để kích hoạt 100% không bị Facebook nuốt sự kiện
+    btn.addEventListener('click', doCopy);
+    btn.addEventListener('pointerup', doCopy);
 
     return btn;
   }
@@ -875,8 +899,15 @@
 
     const videos = document.querySelectorAll('video');
     videos.forEach(video => {
-      // Tìm container thích hợp để đặt nút
-      let wrapper = video.parentElement;
+      // Bỏ qua các video icon / preview quá nhỏ (nếu có)
+      if (video.offsetWidth > 0 && video.offsetWidth < 120) return;
+      if (video.offsetHeight > 0 && video.offsetHeight < 80) return;
+
+      // Tìm container bao quát toàn bộ khung video player để nút nằm trên lớp hiển thị cao nhất
+      let wrapper = video.closest(
+        '[data-video-id], div[role="region"], div[aria-label*="Video"], div[aria-label*="video"], div[data-pagelet*="Reels"]'
+      ) || video.parentElement;
+
       while (wrapper && wrapper !== document.body && wrapper.offsetHeight < 60) {
         wrapper = wrapper.parentElement;
       }
@@ -885,10 +916,10 @@
       }
       if (!wrapper) return;
 
-      // Nếu đã có nút thì bỏ qua
+      // Nếu đã có nút trong wrapper này rồi thì bỏ qua
       if (wrapper.querySelector('.smart-nav-fb-copy-btn')) return;
 
-      // Đảm bảo wrapper có position relative
+      // Đảm bảo wrapper có position relative để nút định vị tuyệt đối chuẩn xác
       const computedPos = window.getComputedStyle(wrapper).position;
       if (computedPos === 'static') {
         wrapper.style.position = 'relative';
