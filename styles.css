@@ -1,0 +1,381 @@
+/* ==========================================================================
+   SMART WEB, YOUTUBE & FORUM NAVIGATOR - STYLESHEET
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. HIGHLIGHT CHO VIDEO TRÊN YOUTUBE (VIỀN ĐỎ PHÁT SÁNG CỰC KỲ RÕ RÀNG)
+   -------------------------------------------------------------------------- */
+.smart-nav-yt-active {
+  outline: 4px solid #ff0000 !important;                  /* Viền đỏ rực bao quanh thẻ video */
+  outline-offset: 3px !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 25px rgba(255, 0, 0, 0.65), 0 0 10px rgba(255, 0, 0, 0.9) !important;
+  transform: scale(1.03) !important;
+  transition: transform 0.15s ease, outline 0.15s ease !important;
+  position: relative !important;
+  z-index: 99999 !important;
+}
+
+/* Con trỏ nổi bật gắn trên góc Thumbnail của Video YouTube */
+.smart-nav-yt-pointer {
+  position: absolute !important;
+  top: 6px !important;
+  left: 6px !important;
+  background: #ff0000 !important;
+  color: #ffffff !important;
+  font-family: "Roboto", -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.5px !important;
+  padding: 4px 10px !important;
+  border-radius: 8px !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.8), 0 0 12px rgba(255, 0, 0, 1) !important;
+  border: 2px solid #ffffff !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  animation: smart-nav-yt-bounce 0.9s infinite alternate ease-in-out !important;
+}
+
+@keyframes smart-nav-yt-bounce {
+  0% { transform: scale(1); }
+  100% { transform: scale(1.15); }
+}
+
+/* --------------------------------------------------------------------------
+   2. HIGHLIGHT CHO BÀI VIẾT / COMMENT TRÊN DIỄN ĐÀN & GOOGLE SEARCH
+   -------------------------------------------------------------------------- */
+.smart-nav-active-item {
+  position: relative !important;
+  border-left: 5px solid #1a73e8 !important;
+  background-color: rgba(26, 115, 232, 0.06) !important;
+  border-radius: 6px !important;
+  transition: all 0.18s ease-in-out !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08) !important;
+}
+
+@media (prefers-color-scheme: dark) {
+  .smart-nav-active-item {
+    border-left-color: #8ab4f8 !important;
+    background-color: rgba(138, 180, 248, 0.1) !important;
+  }
+}
+
+/* Con trỏ Badge cho Diễn đàn & Google */
+.smart-nav-pointer-badge {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: #1a73e8 !important;
+  color: #ffffff !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  padding: 3px 9px !important;
+  border-radius: 12px !important;
+  margin-right: 10px !important;
+  vertical-align: middle !important;
+  box-shadow: 0 2px 6px rgba(26, 115, 232, 0.4) !important;
+  animation: smart-nav-pulse 1.3s infinite ease-in-out !important;
+  z-index: 100 !important;
+}
+
+@keyframes smart-nav-pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+  100% { transform: scale(1); }
+}
+
+/* --------------------------------------------------------------------------
+   3. BẢNG HƯỚNG DẪN PHÍM TẮT Ở GÓC MÀN HÌNH (HUD)
+   -------------------------------------------------------------------------- */
+.smart-nav-help-hud {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  background: rgba(20, 20, 22, 0.94);
+  color: #ffffff;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  z-index: 2147483646;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: none;
+  opacity: 0.9;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.smart-nav-help-hud kbd {
+  background: #4a4d52;
+  color: #f1f3f4;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* --------------------------------------------------------------------------
+   4. TOAST THÔNG BÁO
+   -------------------------------------------------------------------------- */
+.smart-nav-toast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  background-color: rgba(18, 18, 18, 0.94);
+  color: #ffffff;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 2147483647;
+  pointer-events: none;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  opacity: 0;
+  transform: translateY(-12px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.smart-nav-toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* --------------------------------------------------------------------------
+   5. NÚT COPY LINK NHANH CHO VIDEO YOUTUBE (THUMBNAIL & WATCH PAGE)
+   -------------------------------------------------------------------------- */
+.smart-nav-copy-btn {
+  position: absolute !important;
+  bottom: 8px !important;
+  left: 8px !important;
+  z-index: 2147483640 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  padding: 3px 8px !important;
+  height: 24px !important;
+  min-width: 52px !important;
+  box-sizing: border-box !important;
+  background: rgba(18, 18, 18, 0.88) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.28) !important;
+  border-radius: 6px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  opacity: 0.88 !important;
+  transition: all 0.16s ease-in-out !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5) !important;
+  user-select: none !important;
+  text-decoration: none !important;
+  pointer-events: auto !important;
+  outline: none !important;
+}
+
+.smart-nav-copy-btn:hover {
+  opacity: 1 !important;
+  background: #cc0000 !important;
+  border-color: #ff0000 !important;
+  color: #ffffff !important;
+  transform: scale(1.06) !important;
+  box-shadow: 0 3px 10px rgba(255, 0, 0, 0.5) !important;
+}
+
+.smart-nav-copy-btn:active {
+  transform: scale(0.95) !important;
+}
+
+.smart-nav-copy-btn.copied,
+.smart-nav-copy-btn.flash-copied {
+  background: #00875a !important;
+  border-color: #00b875 !important;
+  color: #ffffff !important;
+  opacity: 1 !important;
+  transform: scale(1.06) !important;
+  box-shadow: 0 0 12px rgba(0, 200, 83, 0.7) !important;
+}
+
+/* Trạng thái ĐÃ COPY / ĐÃ XEM CỦA YOUTUBE (Dấu tích xanh nổi bật) */
+.smart-nav-copy-btn.already-copied {
+  background: rgba(6, 78, 59, 0.92) !important;
+  border: 1px solid #10b981 !important;
+  color: #ecfdf5 !important;
+  opacity: 0.95 !important;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.4) !important;
+}
+
+.smart-nav-copy-btn.already-copied .icon-copy {
+  display: none !important;
+}
+
+.smart-nav-copy-btn.already-copied .icon-check {
+  display: inline-block !important;
+  color: #34d399 !important;
+}
+
+.smart-nav-copy-btn.already-copied:hover {
+  background: #059669 !important;
+  border-color: #34d399 !important;
+  color: #ffffff !important;
+  transform: scale(1.06) !important;
+  box-shadow: 0 3px 12px rgba(16, 185, 129, 0.55) !important;
+}
+
+.smart-nav-copy-btn svg {
+  display: block !important;
+  flex-shrink: 0 !important;
+  pointer-events: none !important;
+}
+
+.smart-nav-copy-btn span {
+  display: inline-block !important;
+  pointer-events: none !important;
+  letter-spacing: 0.2px !important;
+}
+
+/* Nút copy link trên thanh công cụ của trang Watch (dưới video đang xem) */
+.smart-nav-watch-copy-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  height: 36px !important;
+  padding: 0 14px !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  color: #f1f1f1 !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 18px !important;
+  font-family: "Roboto", -apple-system, BlinkMacSystemFont, sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all 0.18s ease !important;
+  margin-right: 8px !important;
+  vertical-align: middle !important;
+  user-select: none !important;
+  outline: none !important;
+}
+
+.smart-nav-watch-copy-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2) !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  transform: scale(1.03) !important;
+}
+
+.smart-nav-watch-copy-btn.copied,
+.smart-nav-watch-copy-btn.flash-copied {
+  background-color: #00875a !important;
+  border-color: #00b875 !important;
+  color: #ffffff !important;
+}
+
+.smart-nav-watch-copy-btn.already-copied {
+  background-color: rgba(6, 78, 59, 0.88) !important;
+  border-color: #10b981 !important;
+  color: #ecfdf5 !important;
+}
+
+.smart-nav-watch-copy-btn.already-copied .icon-copy {
+  display: none !important;
+}
+
+.smart-nav-watch-copy-btn.already-copied .icon-check {
+  display: inline-block !important;
+  color: #34d399 !important;
+}
+
+.smart-nav-watch-copy-btn.already-copied:hover {
+  background-color: #059669 !important;
+  border-color: #34d399 !important;
+  color: #ffffff !important;
+}
+
+html:not([dark]) .smart-nav-watch-copy-btn {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  color: #0f0f0f !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+html:not([dark]) .smart-nav-watch-copy-btn:hover {
+  background-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+/* --------------------------------------------------------------------------
+   6. NÚT COPY LINK VIDEO CHO FACEBOOK (FEED, REELS, WATCH)
+   -------------------------------------------------------------------------- */
+.smart-nav-fb-copy-btn {
+  position: absolute !important;
+  top: 10px !important;
+  left: 10px !important;
+  z-index: 2147483640 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  padding: 4px 10px !important;
+  height: 26px !important;
+  box-sizing: border-box !important;
+  background: rgba(24, 25, 26, 0.88) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 6px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  opacity: 0.92 !important;
+  transition: all 0.16s ease-in-out !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45) !important;
+  user-select: none !important;
+  pointer-events: auto !important;
+  outline: none !important;
+}
+
+.smart-nav-fb-copy-btn:hover {
+  opacity: 1 !important;
+  background: #1877f2 !important; /* Facebook Blue */
+  border-color: #2e89ff !important;
+  color: #ffffff !important;
+  transform: scale(1.06) !important;
+  box-shadow: 0 3px 12px rgba(24, 119, 242, 0.5) !important;
+}
+
+.smart-nav-fb-copy-btn:active {
+  transform: scale(0.95) !important;
+}
+
+.smart-nav-fb-copy-btn.flash-copied {
+  background: #00875a !important;
+  border-color: #00b875 !important;
+  color: #ffffff !important;
+  opacity: 1 !important;
+  transform: scale(1.06) !important;
+  box-shadow: 0 0 12px rgba(0, 200, 83, 0.7) !important;
+}
+
+.smart-nav-fb-copy-btn svg {
+  display: block !important;
+  flex-shrink: 0 !important;
+  pointer-events: none !important;
+}
+
+.smart-nav-fb-copy-btn span {
+  display: inline-block !important;
+  pointer-events: none !important;
+  letter-spacing: 0.2px !important;
+}
