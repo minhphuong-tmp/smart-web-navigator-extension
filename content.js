@@ -694,6 +694,211 @@
     updateAllVideoButtonsState();
   }
 
+  // ============================================================================
+  // PHẦN: TÍNH NĂNG COPY LINK VIDEO / REEL CHO FACEBOOK (DÙNG CHO SKILL XEM VIDEO)
+  // ============================================================================
+
+  /**
+   * LÀM SẠCH VÀ CHUẨN HÓA LINK VIDEO / REEL FACEBOOK (LOẠI BỎ TRACKING FBCLID, MIBEXTID...)
+   */
+  function getCleanFacebookUrl(rawUrl) {
+    if (!rawUrl) return '';
+    try {
+      const url = new URL(rawUrl, window.location.origin);
+
+      // Xóa tất cả tham số tracking rác của Facebook
+      const trackingParams = [
+        'fbclid', 'mibextid', 'rdid', 'ref', 'refsrc', 'hrc',
+        '__cft__', '__tn__', 'fs', 's', 'sfnsn', 'locale2', 'paipv',
+        'checkpoint_src', 'notif_id', 'notif_t', 'startTime', 'comment_id'
+      ];
+      trackingParams.forEach(p => url.searchParams.delete(p));
+
+      // 1. Dạng Facebook Reel (/reel/123456789)
+      const reelMatch = url.pathname.match(/\/reel\/(\d+)/);
+      if (reelMatch) {
+        return `https://www.facebook.com/reel/${reelMatch[1]}`;
+      }
+
+      // 2. Dạng Facebook Watch (/watch/?v=123456789)
+      if (url.searchParams.has('v')) {
+        const v = url.searchParams.get('v');
+        if (v && /^\d+$/.test(v)) {
+          return `https://www.facebook.com/watch/?v=${v}`;
+        }
+      }
+
+      // 3. Dạng Profile / Page Videos (/username/videos/123456789/)
+      const videoMatch = url.pathname.match(/\/videos\/(\d+)/);
+      if (videoMatch) {
+        return `https://www.facebook.com/watch/?v=${videoMatch[1]}`;
+      }
+
+      // 4. Dạng Posts có chứa ID bài viết (/username/posts/123456789)
+      const postMatch = url.pathname.match(/\/posts\/(\d+)/);
+      if (postMatch) {
+        return `https://www.facebook.com/watch/?v=${postMatch[1]}`;
+      }
+
+      return url.origin + url.pathname + (url.search ? url.search : '');
+    } catch (e) {
+      return rawUrl;
+    }
+  }
+
+  /**
+   * TÌM LINK GỐC CỦA VIDEO TRÊN FACEBOOK TỪ THẺ VIDEO VÀ CONTAINER
+   */
+  function findFacebookVideoUrl(videoEl, container) {
+    // 1. Nếu người dùng đang mở trang Reel hoặc Watch trực tiếp
+    if (window.location.pathname.startsWith('/reel/')) {
+      return getCleanFacebookUrl(window.location.href);
+    }
+    if (window.location.pathname.startsWith('/watch')) {
+      return getCleanFacebookUrl(window.location.href);
+    }
+
+    if (!container) {
+      container = videoEl.closest('div[role="feed"] > div, div[role="article"], div[data-pagelet*="FeedUnit"], div[data-pagelet*="Reels"], div[role="dialog"]') || videoEl.parentElement;
+    }
+
+    if (container) {
+      // 2. Tìm thẻ <a> chứa link Reel hoặc Watch hoặc Videos
+      const directVideoLink = container.querySelector(
+        'a[href*="/reel/"], a[href*="/videos/"], a[href*="/watch?v="], a[href*="/watch/?v="]'
+      );
+      if (directVideoLink && directVideoLink.href) {
+        return getCleanFacebookUrl(directVideoLink.href);
+      }
+
+      // 3. Tìm thẻ <a> timestamp permalink (ngày giờ đăng bài)
+      const permalink = container.querySelector(
+        'a[href*="/posts/"], a[href*="/permalink/"], a[href*="story_fbid="], a[aria-label*="giờ"], a[aria-label*="phút"], a[aria-label*="ngày"], a[aria-label*="ago"], a[aria-label*="min"], a[aria-label*="hour"]'
+      );
+      if (permalink && permalink.href) {
+        return getCleanFacebookUrl(permalink.href);
+      }
+
+      // 4. Tìm bất kỳ link nào có ID số trong pathname
+      const allLinks = container.querySelectorAll('a[href]');
+      for (const a of allLinks) {
+        const h = a.href;
+        if (h && (h.includes('/reel/') || h.includes('/watch') || h.includes('/videos/') || h.includes('/posts/'))) {
+          return getCleanFacebookUrl(h);
+        }
+      }
+    }
+
+    // Fallback: URL hiện tại
+    return getCleanFacebookUrl(window.location.href);
+  }
+
+  /**
+   * TẠO NÚT BẤM COPY LINK GẮN VÀO VIDEO FACEBOOK
+   */
+  function createFacebookCopyButton(videoEl) {
+    const btn = document.createElement('button');
+    btn.className = 'smart-nav-fb-copy-btn';
+    btn.type = 'button';
+    btn.title = 'Sao chép link clip Facebook (Dùng cho skill xem video)';
+    btn.setAttribute('aria-label', 'Copy link clip Facebook');
+
+    btn.innerHTML = `
+      <svg class="icon-copy" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      <svg class="icon-check" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      <span class="smart-nav-fb-btn-label">Copy clip</span>
+    `;
+
+    // Chặn sự kiện chuột để Facebook không tạm dừng video hay chuyển trang khi bấm nút
+    ['mousedown', 'mouseup', 'pointerdown', 'touchstart'].forEach(evtType => {
+      btn.addEventListener(evtType, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      }, true);
+    });
+
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      const container = videoEl.closest(
+        'div[role="feed"] > div, div[role="article"], div[data-pagelet*="FeedUnit"], div[data-pagelet*="Reels"], div[role="dialog"]'
+      ) || videoEl.parentElement;
+
+      const rawUrl = findFacebookVideoUrl(videoEl, container);
+      if (!rawUrl) {
+        showToast('⚠️ Không tìm thấy link clip Facebook để copy');
+        return;
+      }
+
+      const cleanUrl = getCleanFacebookUrl(rawUrl);
+      const success = await copyToClipboard(cleanUrl);
+
+      if (success) {
+        btn.classList.add('flash-copied');
+        const iconCopy = btn.querySelector('.icon-copy');
+        const iconCheck = btn.querySelector('.icon-check');
+        const label = btn.querySelector('.smart-nav-fb-btn-label');
+
+        if (iconCopy) iconCopy.style.display = 'none';
+        if (iconCheck) iconCheck.style.display = 'inline-block';
+        if (label) label.textContent = 'Đã copy!';
+
+        showToast(`📋 Đã copy link clip Facebook! (Sẵn sàng gửi skill xem video)`);
+
+        setTimeout(() => {
+          btn.classList.remove('flash-copied');
+          if (iconCopy) iconCopy.style.display = 'inline-block';
+          if (iconCheck) iconCheck.style.display = 'none';
+          if (label) label.textContent = 'Copy clip';
+        }, 1300);
+      } else {
+        showToast('⚠️ Không thể copy link vào clipboard');
+      }
+    }, true);
+
+    return btn;
+  }
+
+  /**
+   * TỰ ĐỘNG QUÉT VÀ GẮN NÚT COPY CHO TẤT CẢ VIDEO / REEL TRÊN FACEBOOK
+   */
+  function attachCopyButtonsToFacebook() {
+    if (!window.location.hostname.includes('facebook.com')) return;
+
+    const videos = document.querySelectorAll('video');
+    videos.forEach(video => {
+      // Tìm container thích hợp để đặt nút
+      let wrapper = video.parentElement;
+      while (wrapper && wrapper !== document.body && wrapper.offsetHeight < 60) {
+        wrapper = wrapper.parentElement;
+      }
+      if (!wrapper || wrapper === document.body) {
+        wrapper = video.parentElement;
+      }
+      if (!wrapper) return;
+
+      // Nếu đã có nút thì bỏ qua
+      if (wrapper.querySelector('.smart-nav-fb-copy-btn')) return;
+
+      // Đảm bảo wrapper có position relative
+      const computedPos = window.getComputedStyle(wrapper).position;
+      if (computedPos === 'static') {
+        wrapper.style.position = 'relative';
+      }
+
+      const btn = createFacebookCopyButton(video);
+      wrapper.appendChild(btn);
+    });
+  }
+
   /**
    * Tạo hoặc lấy thẻ con trỏ chuyên dụng cho YouTube
    */
@@ -1099,6 +1304,9 @@
     if (window.location.hostname.includes('youtube.com')) {
       attachCopyButtonsToYouTube();
     }
+    if (window.location.hostname.includes('facebook.com')) {
+      attachCopyButtonsToFacebook();
+    }
   }
 
   // Khởi tạo và tự động retry cho YouTube khi cột bên phải đang tải bất đồng bộ
@@ -1462,11 +1670,13 @@
       init();
       initYouTubeAutoRetry();
       attachCopyButtonsToYouTube();
+      attachCopyButtonsToFacebook();
     });
   } else {
     init();
     initYouTubeAutoRetry();
     attachCopyButtonsToYouTube();
+    attachCopyButtonsToFacebook();
   }
 
   // Lắng nghe sự kiện chuyển video trong YouTube (Single Page Application)
@@ -1485,6 +1695,9 @@
     debounceTimer = setTimeout(() => {
       if (window.location.hostname.includes('youtube.com')) {
         attachCopyButtonsToYouTube();
+      }
+      if (window.location.hostname.includes('facebook.com')) {
+        attachCopyButtonsToFacebook();
       }
       const updated = scanPageItems();
       if (updated.length > 0 && (updated.length !== currentItems.length || pageMode === 'youtube')) {

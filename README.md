@@ -9,10 +9,16 @@
 ### 1. 📺 Tối Ưu Hóa Trải Nghiệm YouTube
 - **Nút Copy Link Siêu Tốc:** Nút bấm nhỏ gọn, tinh tế gắn trực tiếp vào từng thumbnail video trên Trang chủ, Tìm kiếm, Kênh và Cột đề xuất bên phải.
 - **Đánh Dấu "✓ Đã Xem" Vĩnh Viễn:** Khi bấm copy, video lập tức được lưu vào bộ nhớ cục bộ (`chrome.storage.local`) và hiển thị dấu tích xanh `✓ Đã xem`. F5 hoặc khởi động lại trình duyệt vẫn ghi nhớ.
-- **Tự Động Ghi Vào Lịch Sử YouTube (Watch History):** Khi copy, extension tự động gửi tín hiệu hoàn tất lượt xem tới server YouTube (qua tab ngầm tắt tiếng trong 2 giây). Thuật toán YouTube sẽ ghi nhận bạn đã xem xong và tự động đề xuất các clip mới tinh.
+- **Tự Động Báo YouTube Đã Xem:** Tự động gửi phản hồi *"Tôi đã xem video này rồi"* tới thuật toán YouTube để loại bỏ video khỏi bảng tin và đề xuất các clip mới thay thế ngay lập tức.
 - **Phím Tắt [c]:** Bấm phím `c` trên bàn phím để copy link video đang chọn ngay tức thì.
 
-### 2. 💬 Diễn Đàn (Voz, Tinh tế, Reddit, XenForo, v.v.)
+### 2. 📱 Copy Link Clip & Reel Trên Facebook (Dùng Cho AI Xem Video)
+- **Nút "Copy clip" Gắn Trên Mọi Video:** Tự động phát hiện video, Reels, video trong bài viết Feed, nhóm hoặc trang Facebook và hiển thị nút copy nhỏ gọn ở góc trên clip.
+- **Chuẩn Hóa Link Tự Động:** Loại bỏ toàn bộ các tham số tracking rác của Facebook (`fbclid`, `mibextid`, `__tn__`...) để trả về link video chuẩn xác nhất (`facebook.com/reel/ID` hoặc `facebook.com/watch/?v=ID`).
+- **Tương Thích Tuyệt Đối Với `skill xem video`:** Chỉ cần bấm nút copy trên Facebook, bạn có thể gửi ngay vào chat AI để bóc băng, tóm tắt hoặc xem nội dung video.
+- *(Lưu ý: Clip Facebook không gắn dấu tích đã xem, chỉ hỗ trợ copy link nhanh).*
+
+### 3. 💬 Diễn Đàn (Voz, Tinh tế, Reddit, XenForo, v.v.)
 - **Phím [Tab] / [Shift + Tab]:** Nhảy nhanh qua từng bài viết hoặc bình luận kế tiếp.
 - **Phím [Enter]:** Mở bài viết / link trong **Tab mới chạy ngầm (active = false)**, không làm gián đoạn trang đang đọc.
 - **Phím [Shift + Mũi tên Phải/Trái]:** Chuyển trang tiếp theo / trang trước liền mạch.

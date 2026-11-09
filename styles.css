@@ -311,3 +311,71 @@ html:not([dark]) .smart-nav-watch-copy-btn {
 html:not([dark]) .smart-nav-watch-copy-btn:hover {
   background-color: rgba(0, 0, 0, 0.1) !important;
 }
+
+/* --------------------------------------------------------------------------
+   6. NÚT COPY LINK VIDEO CHO FACEBOOK (FEED, REELS, WATCH)
+   -------------------------------------------------------------------------- */
+.smart-nav-fb-copy-btn {
+  position: absolute !important;
+  top: 10px !important;
+  left: 10px !important;
+  z-index: 2147483640 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 5px !important;
+  padding: 4px 10px !important;
+  height: 26px !important;
+  box-sizing: border-box !important;
+  background: rgba(24, 25, 26, 0.88) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  border-radius: 6px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  opacity: 0.92 !important;
+  transition: all 0.16s ease-in-out !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45) !important;
+  user-select: none !important;
+  pointer-events: auto !important;
+  outline: none !important;
+}
+
+.smart-nav-fb-copy-btn:hover {
+  opacity: 1 !important;
+  background: #1877f2 !important; /* Facebook Blue */
+  border-color: #2e89ff !important;
+  color: #ffffff !important;
+  transform: scale(1.06) !important;
+  box-shadow: 0 3px 12px rgba(24, 119, 242, 0.5) !important;
+}
+
+.smart-nav-fb-copy-btn:active {
+  transform: scale(0.95) !important;
+}
+
+.smart-nav-fb-copy-btn.flash-copied {
+  background: #00875a !important;
+  border-color: #00b875 !important;
+  color: #ffffff !important;
+  opacity: 1 !important;
+  transform: scale(1.06) !important;
+  box-shadow: 0 0 12px rgba(0, 200, 83, 0.7) !important;
+}
+
+.smart-nav-fb-copy-btn svg {
+  display: block !important;
+  flex-shrink: 0 !important;
+  pointer-events: none !important;
+}
+
+.smart-nav-fb-copy-btn span {
+  display: inline-block !important;
+  pointer-events: none !important;
+  letter-spacing: 0.2px !important;
+}
