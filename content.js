@@ -930,8 +930,28 @@
       isCopying = true;
       setTimeout(() => { isCopying = false; }, 800);
 
-      const rawUrl = findFacebookVideoUrl(videoEl);
-      if (!rawUrl) {
+      let rawUrl = findFacebookVideoUrl(videoEl);
+
+      // Nếu đang lướt Feed mà Facebook giấu link ngầm trong tham số mã hóa __cft__:
+      // Tự động kích hoạt mở video để Facebook kích hoạt router và cập nhật URL sang /reel/ID hoặc /watch/?v=ID
+      if (!rawUrl || !isValidFacebookVideoUrl(rawUrl)) {
+        try {
+          const container = findFacebookPlayerContainer(videoEl);
+          const presentation = container ? container.querySelector('[role="presentation"]') : null;
+          if (presentation) {
+            presentation.click();
+          } else {
+            videoEl.click();
+          }
+          // Chờ 350ms để router của Facebook cập nhật window.location sang URL video cụ thể
+          await new Promise(r => setTimeout(r, 350));
+          rawUrl = findFacebookVideoUrl(videoEl) || (isValidFacebookVideoUrl(window.location.href) ? window.location.href : null);
+        } catch (err) {
+          console.warn('[Smart Nav] Tự động kích hoạt router video thất bại:', err);
+        }
+      }
+
+      if (!rawUrl || !isValidFacebookVideoUrl(rawUrl)) {
         showToast('⚠️ Clip này đang bị Facebook ẩn link trên Bảng tin. Hãy click mở to clip rồi bấm Copy clip nhé!');
         return;
       }
