@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Smart Web & Forum Navigator",
-  "version": "1.5.2",
+  "version": "1.5.3",
   "description": "Điều hướng bài viết/comment trên diễn đàn & Google bằng Tab, mở tab ngầm với Enter. Nút copy link nhanh video YouTube (kèm đánh dấu đã xem) & video/reel Facebook (chuẩn hóa link cho AI xem video).",
   "permissions": [
     "tabs",

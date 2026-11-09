@@ -812,28 +812,52 @@
   }
 
   /**
+   * KIỂM TRA XEM URL CÓ PHẢI LÀ LINK CLIP / BÀI VIẾT FACEBOOK HỢP LỆ KHÔNG (TRÁNH LINK TRANG CHỦ)
+   */
+  function isValidFacebookVideoUrl(urlStr) {
+    if (!urlStr) return false;
+    try {
+      const u = new URL(urlStr, window.location.origin);
+      const p = u.pathname;
+      // Tuyệt đối không chấp nhận trang chủ hoặc feed chung
+      if (p === '/' || p === '' || p === '/home.php' || p.startsWith('/feed')) return false;
+
+      return (
+        p.includes('/reel/') ||
+        p.includes('/videos/') ||
+        p.includes('/watch') ||
+        p.includes('/posts/') ||
+        p.includes('/permalink/') ||
+        p.includes('story.php') ||
+        p.includes('permalink.php') ||
+        u.searchParams.has('v') ||
+        u.searchParams.has('story_fbid')
+      );
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
    * TÌM LINK GỐC CỦA VIDEO TRÊN FACEBOOK TỪ THẺ VIDEO VÀ ANCESTOR DOM
    */
   function findFacebookVideoUrl(videoEl) {
     // 1. Nếu người dùng đang mở trang Reel hoặc Watch trực tiếp
-    if (window.location.pathname.startsWith('/reel')) {
-      return getCleanFacebookUrl(window.location.href);
-    }
-    if (window.location.pathname.startsWith('/watch')) {
+    if (window.location.pathname.startsWith('/reel') || window.location.pathname.startsWith('/watch')) {
       return getCleanFacebookUrl(window.location.href);
     }
 
-    // 2. Duyệt ngược lên các thẻ cha (tối đa 20 cấp) để tìm thẻ chứa link bài viết hoặc video
+    // 2. Duyệt ngược lên các thẻ cha (tối đa 25 cấp) để tìm link video/reel hoặc nút mở rộng
     let curr = videoEl;
-    let maxSteps = 20;
+    let maxSteps = 25;
     while (curr && curr !== document.body && maxSteps > 0) {
       maxSteps--;
 
-      // Ưu tiên 1: Link trực tiếp tới Reel hoặc Video hoặc Watch
+      // Ưu tiên 1: Link trực tiếp tới Reel hoặc Video hoặc Watch (kể cả nút 'Mở rộng' / Fullscreen trên player)
       const direct = curr.querySelector(
-        'a[href*="/reel/"], a[href*="/videos/"], a[href*="/watch?v="], a[href*="/watch/?v="]'
+        'a[href*="/reel/"], a[href*="/videos/"], a[href*="/watch?v="], a[href*="/watch/?v="], a[aria-label*="Mở rộng"], a[aria-label*="Expand"], a[aria-label*="toàn màn hình"]'
       );
-      if (direct && direct.href) {
+      if (direct && direct.href && isValidFacebookVideoUrl(direct.href)) {
         return getCleanFacebookUrl(direct.href);
       }
 
@@ -841,7 +865,7 @@
       const postLink = curr.querySelector(
         'a[href*="/posts/"], a[href*="/permalink/"], a[href*="permalink.php"], a[href*="story.php"], a[href*="story_fbid="]'
       );
-      if (postLink && postLink.href) {
+      if (postLink && postLink.href && isValidFacebookVideoUrl(postLink.href)) {
         return getCleanFacebookUrl(postLink.href);
       }
 
@@ -849,7 +873,7 @@
       const timeLink = curr.querySelector(
         'a[aria-label*="giờ"], a[aria-label*="phút"], a[aria-label*="ngày"], a[aria-label*="ago"], a[aria-label*="hour"], a[aria-label*="min"], a[aria-label*="yesterday"]'
       );
-      if (timeLink && timeLink.href) {
+      if (timeLink && timeLink.href && isValidFacebookVideoUrl(timeLink.href)) {
         return getCleanFacebookUrl(timeLink.href);
       }
 
@@ -861,12 +885,17 @@
     const candidates = root.querySelectorAll('a[href]');
     for (const a of candidates) {
       const h = a.href || '';
-      if (h.includes('/reel/') || h.includes('/videos/') || h.includes('/watch') || h.includes('/posts/') || h.includes('story_fbid=')) {
+      if (isValidFacebookVideoUrl(h)) {
         return getCleanFacebookUrl(h);
       }
     }
 
-    return getCleanFacebookUrl(window.location.href);
+    // Nếu trang hiện tại là link bài viết hoặc video cụ thể
+    if (isValidFacebookVideoUrl(window.location.href)) {
+      return getCleanFacebookUrl(window.location.href);
+    }
+
+    return null;
   }
 
   /**
@@ -903,7 +932,7 @@
 
       const rawUrl = findFacebookVideoUrl(videoEl);
       if (!rawUrl) {
-        showToast('⚠️ Không tìm thấy link clip Facebook để copy');
+        showToast('⚠️ Clip này đang bị Facebook ẩn link trên Bảng tin. Hãy click mở to clip rồi bấm Copy clip nhé!');
         return;
       }
 
