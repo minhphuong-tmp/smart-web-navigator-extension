@@ -126,20 +126,23 @@
       }
     }
 
-    // 2. Fallback dùng textarea ẩn + execCommand
+    // 2. Fallback dùng textarea ngoài màn hình + execCommand
     try {
       const textarea = document.createElement('textarea');
       textarea.value = text;
       textarea.style.position = 'fixed';
       textarea.style.top = '0';
-      textarea.style.left = '0';
-      textarea.style.width = '1px';
-      textarea.style.height = '1px';
-      textarea.style.opacity = '0';
-      textarea.style.pointerEvents = 'none';
+      textarea.style.left = '-9999px';
+      textarea.style.width = '200px';
+      textarea.style.height = '200px';
+      textarea.style.opacity = '0.01';
+      textarea.setAttribute('readonly', '');
       document.body.appendChild(textarea);
+
       textarea.focus();
       textarea.select();
+      textarea.setSelectionRange(0, 99999);
+
       const successful = document.execCommand('copy');
       document.body.removeChild(textarea);
       return successful;
@@ -706,13 +709,20 @@
     try {
       const url = new URL(rawUrl, window.location.origin);
 
-      // Xóa tất cả tham số tracking rác của Facebook
-      const trackingParams = [
-        'fbclid', 'mibextid', 'rdid', 'ref', 'refsrc', 'hrc',
-        '__cft__', '__tn__', 'fs', 's', 'sfnsn', 'locale2', 'paipv',
-        'checkpoint_src', 'notif_id', 'notif_t', 'startTime', 'comment_id'
-      ];
-      trackingParams.forEach(p => url.searchParams.delete(p));
+      // Xóa tất cả tham số tracking rác của Facebook (kể cả dạng __cft__[0], __tn__...)
+      Array.from(url.searchParams.keys()).forEach(key => {
+        if (
+          key.startsWith('__cft__') ||
+          key.startsWith('__tn__') ||
+          [
+            'fbclid', 'mibextid', 'rdid', 'ref', 'refsrc', 'hrc',
+            'fs', 's', 'sfnsn', 'locale2', 'paipv',
+            'checkpoint_src', 'notif_id', 'notif_t', 'startTime', 'comment_id'
+          ].includes(key)
+        ) {
+          url.searchParams.delete(key);
+        }
+      });
 
       // 1. Dạng Facebook Reel (/reel/123456789)
       const reelMatch = url.pathname.match(/\/reel\/([0-9a-zA-Z_-]+)/);
@@ -749,10 +759,56 @@
         return clean;
       }
 
-      return url.origin + url.pathname + (url.search ? url.search : '');
+      const searchStr = url.searchParams.toString();
+      return url.origin + url.pathname + (searchStr ? `?${searchStr}` : '');
     } catch (e) {
       return rawUrl;
     }
+  }
+
+  /**
+   * TÌM CONTAINER BAO QUÁT VIDEO PLAYER TRÊN FACEBOOK
+   * Đảm bảo nút copy nằm trên container chung cha của cả video và lớp overlay click-catcher (role="presentation")
+   */
+  function findFacebookPlayerContainer(video) {
+    if (!video || !video.parentElement) return null;
+
+    let curr = video.parentElement;
+    let candidate = null;
+    let steps = 0;
+
+    // 1. Duyệt ngược lên tìm thẻ cha chung chứa cả video và overlay click-catcher
+    while (curr && curr !== document.body && steps < 12) {
+      steps++;
+
+      // Kiểm tra xem ancestor này có chứa lớp overlay (role="presentation" hoặc nút Play/Pause)
+      const hasOverlay = curr.querySelector(
+        '[role="presentation"], [aria-label*="Play"], [aria-label*="Phát"], [aria-label*="Pause"], [aria-label*="Tạm dừng"]'
+      );
+
+      // Ancestor hợp lệ phải có nhiều hơn 1 nhánh con (một nhánh chứa video, một nhánh chứa overlay/controls)
+      if (hasOverlay && curr.children.length > 1) {
+        candidate = curr;
+        break;
+      }
+
+      curr = curr.parentElement;
+    }
+
+    if (candidate) return candidate;
+
+    // 2. Fallback nếu không tìm thấy overlay: tìm khung player theo selector đặc trưng của Facebook
+    const playerWrapper = video.closest(
+      '[data-video-id], div[role="region"], div[aria-label*="Video"], div[aria-label*="video"], div[data-pagelet*="Reels"]'
+    );
+    if (playerWrapper) return playerWrapper;
+
+    // 3. Fallback theo chiều cao
+    let fallback = video.parentElement;
+    while (fallback && fallback !== document.body && fallback.offsetHeight < 60) {
+      fallback = fallback.parentElement;
+    }
+    return fallback || video.parentElement;
   }
 
   /**
@@ -767,9 +823,9 @@
       return getCleanFacebookUrl(window.location.href);
     }
 
-    // 2. Duyệt ngược lên các thẻ cha (tối đa 15 cấp) để tìm thẻ chứa link bài viết hoặc video
+    // 2. Duyệt ngược lên các thẻ cha (tối đa 20 cấp) để tìm thẻ chứa link bài viết hoặc video
     let curr = videoEl;
-    let maxSteps = 15;
+    let maxSteps = 20;
     while (curr && curr !== document.body && maxSteps > 0) {
       maxSteps--;
 
@@ -837,9 +893,9 @@
     let isCopying = false;
     async function doCopy(e) {
       if (e) {
+        e.preventDefault();
         e.stopPropagation();
         e.stopImmediatePropagation();
-        if (e.preventDefault) e.preventDefault();
       }
       if (isCopying) return;
       isCopying = true;
@@ -877,16 +933,15 @@
       }
     }
 
-    // Chỉ chặn propagation để video Facebook không bị pause/nhảy trang, KHÔNG preventDefault mousedown!
-    ['pointerdown', 'mousedown', 'mouseup'].forEach(evtType => {
+    // Chặn propagation các sự kiện chuột/pointer để Facebook không nhận diện là click vào player (gây pause hoặc phóng to)
+    ['pointerdown', 'mousedown', 'mouseup', 'pointerup'].forEach(evtType => {
       btn.addEventListener(evtType, (e) => {
         e.stopPropagation();
       });
     });
 
-    // Lắng nghe cả click và pointerup để kích hoạt 100% không bị Facebook nuốt sự kiện
+    // Bắt sự kiện click để thực hiện copy
     btn.addEventListener('click', doCopy);
-    btn.addEventListener('pointerup', doCopy);
 
     return btn;
   }
@@ -899,34 +954,26 @@
 
     const videos = document.querySelectorAll('video');
     videos.forEach(video => {
-      // Bỏ qua các video icon / preview quá nhỏ (nếu có)
+      // Bỏ qua các video icon / preview quá nhỏ (Stories preview tile: 110x160, icon nhỏ: <120x80)
       if (video.offsetWidth > 0 && video.offsetWidth < 120) return;
       if (video.offsetHeight > 0 && video.offsetHeight < 80) return;
 
-      // Tìm container bao quát toàn bộ khung video player để nút nằm trên lớp hiển thị cao nhất
-      let wrapper = video.closest(
-        '[data-video-id], div[role="region"], div[aria-label*="Video"], div[aria-label*="video"], div[data-pagelet*="Reels"]'
-      ) || video.parentElement;
+      // Tìm container bao quát toàn bộ khung video player
+      const container = findFacebookPlayerContainer(video);
+      if (!container) return;
 
-      while (wrapper && wrapper !== document.body && wrapper.offsetHeight < 60) {
-        wrapper = wrapper.parentElement;
-      }
-      if (!wrapper || wrapper === document.body) {
-        wrapper = video.parentElement;
-      }
-      if (!wrapper) return;
+      // Nếu trong container này hoặc bất kỳ thẻ con nào đã có nút rồi thì không gắn trùng
+      if (container.querySelector('.smart-nav-fb-copy-btn')) return;
 
-      // Nếu đã có nút trong wrapper này rồi thì bỏ qua
-      if (wrapper.querySelector('.smart-nav-fb-copy-btn')) return;
-
-      // Đảm bảo wrapper có position relative để nút định vị tuyệt đối chuẩn xác
-      const computedPos = window.getComputedStyle(wrapper).position;
+      // Đảm bảo container có position relative để nút định vị tuyệt đối theo khung video
+      const computedPos = window.getComputedStyle(container).position;
       if (computedPos === 'static') {
-        wrapper.style.position = 'relative';
+        container.style.position = 'relative';
       }
 
       const btn = createFacebookCopyButton(video);
-      wrapper.appendChild(btn);
+      // Append vào cuối container để z-index và thứ tự DOM luôn nằm trên cùng (đè lên overlay click-catcher)
+      container.appendChild(btn);
     });
   }
 
@@ -1741,6 +1788,24 @@
   });
 
   observer.observe(document.body, { childList: true, subtree: true });
+
+  // Lắng nghe sự kiện scroll trên Facebook để quét video mới tải khi cuộn
+  let fbScrollTimer = null;
+  window.addEventListener('scroll', () => {
+    if (window.location.hostname.includes('facebook.com')) {
+      if (fbScrollTimer) clearTimeout(fbScrollTimer);
+      fbScrollTimer = setTimeout(() => {
+        attachCopyButtonsToFacebook();
+      }, 350);
+    }
+  }, { passive: true });
+
+  // Lắng nghe thay đổi URL trong Facebook SPA (popstate)
+  window.addEventListener('popstate', () => {
+    if (window.location.hostname.includes('facebook.com')) {
+      setTimeout(attachCopyButtonsToFacebook, 500);
+    }
+  });
 
   console.log('[Smart Web, YouTube & Forum Navigator] Tiện ích sẵn sàng: Chọn video bằng Tab & Copy link video siêu tốc!');
 })();
