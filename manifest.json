@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Smart Web & Forum Navigator",
-  "version": "1.4.2",
-  "description": "Điều hướng bài viết/comment trên diễn đàn & Google bằng Tab, mở tab ngầm với Enter, chuyển trang với Shift + Mũi tên. Thêm nút copy link nhanh trên video YouTube kèm đánh dấu video đã xem và tự động ghi nhận vào Lịch sử YouTube.",
+  "version": "1.4.3",
+  "description": "Điều hướng bài viết/comment trên diễn đàn & Google bằng Tab, mở tab ngầm với Enter, chuyển trang với Shift + Mũi tên. Thêm nút copy link nhanh trên video YouTube kèm đánh dấu video đã xem và tự động gửi phản hồi Đã xem tới thuật toán YouTube.",
   "permissions": [
     "tabs",
     "clipboardWrite",

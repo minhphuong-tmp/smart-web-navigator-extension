@@ -274,22 +274,119 @@
       } catch (e) {}
     }
 
-    // Gửi yêu cầu sang background service worker để ghi nhận video vào Lịch sử xem (Watch History) của YouTube
-    const isCurrentlyWatchingThis = window.location.pathname.startsWith('/watch') &&
-      extractYouTubeVideoId(window.location.href) === videoId;
-
-    if (!isCurrentlyWatchingThis && typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
-      try {
-        chrome.runtime.sendMessage({
-          action: 'markAsWatchedOnYouTube',
-          videoId: videoId
-        }, () => {
-          if (chrome.runtime?.lastError) {}
-        });
-      } catch (e) {}
-    }
-
     updateAllVideoButtonsState(videoId);
+  }
+
+  /**
+   * TỰ ĐỘNG BÁO CHO YOUTUBE: "TÔI ĐÃ XEM VIDEO NÀY RỒI" (CÁCH A)
+   * Chuỗi thao tác: 3 chấm ➔ Không quan tâm ➔ Cho chúng tôi biết lý do ➔ Tôi đã xem video này rồi ➔ Gửi
+   */
+  async function dismissVideoAsWatched(card) {
+    if (!card) return false;
+    try {
+      // 1. Tìm nút 3 chấm menu trên thẻ video
+      const menuBtn = card.querySelector(
+        'ytd-menu-renderer yt-icon-button button, ytd-menu-renderer #button, ' +
+        'button[aria-label*="Action menu"], button[aria-label*="Menu"], button[aria-label*="menu"], ' +
+        'yt-icon-button.dropdown-trigger button, yt-icon-button.dropdown-trigger, #menu button'
+      );
+      if (!menuBtn) return false;
+
+      // Click nút 3 chấm để mở menu
+      menuBtn.click();
+
+      // 2. Chờ popup menu xuất hiện và tìm mục "Không quan tâm" / "Not interested"
+      let notInterestedItem = null;
+      for (let i = 0; i < 8; i++) {
+        await new Promise(r => setTimeout(r, 60));
+        const items = document.querySelectorAll(
+          'ytd-menu-popup-renderer ytd-menu-service-item-renderer, ' +
+          'ytd-menu-popup-renderer tp-yt-paper-item, ' +
+          'ytd-menu-popup-renderer yt-formatted-string'
+        );
+        for (const item of items) {
+          const text = (item.textContent || '').trim().toLowerCase();
+          if (text.includes('không quan tâm') || text.includes('not interested')) {
+            notInterestedItem = item;
+            break;
+          }
+        }
+        if (notInterestedItem) break;
+      }
+
+      if (!notInterestedItem) {
+        // Đóng menu nếu không tìm thấy tùy chọn
+        document.body.click();
+        return false;
+      }
+
+      // Click "Không quan tâm"
+      notInterestedItem.click();
+
+      // 3. Chờ thẻ video chuyển sang ô thông báo có nút "Cho chúng tôi biết lý do" / "Tell us why"
+      let tellUsWhyBtn = null;
+      for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 70));
+        const notif = card.querySelector(
+          'ytd-notification-multi-action-renderer, ytd-dismissed-renderer, #dismissed'
+        ) || card;
+        const buttons = notif.querySelectorAll('button, yt-button-shape button, a');
+        for (const btn of buttons) {
+          const text = (btn.textContent || '').trim().toLowerCase();
+          if (text.includes('lý do') || text.includes('tell us why')) {
+            tellUsWhyBtn = btn;
+            break;
+          }
+        }
+        if (tellUsWhyBtn) break;
+      }
+
+      if (!tellUsWhyBtn) return true;
+
+      // Click "Cho chúng tôi biết lý do"
+      tellUsWhyBtn.click();
+
+      // 4. Chờ danh sách lý do xuất hiện và tìm "Tôi đã xem video này rồi" / "already watched"
+      let alreadyWatchedOption = null;
+      for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 70));
+        const options = document.querySelectorAll(
+          'ytd-dismissal-follow-up-renderer, tp-yt-paper-checkbox, yt-checkbox-renderer, ' +
+          'ytd-checkbox-renderer, tp-yt-paper-radio-button, [role="checkbox"], [role="radio"], ' +
+          'ytd-dismissal-follow-up-renderer yt-formatted-string, ytd-dismissal-follow-up-renderer label'
+        );
+        for (const opt of options) {
+          const text = (opt.textContent || '').trim().toLowerCase();
+          if (text.includes('đã xem') || text.includes('already watched')) {
+            alreadyWatchedOption = opt;
+            break;
+          }
+        }
+        if (alreadyWatchedOption) break;
+      }
+
+      if (alreadyWatchedOption) {
+        alreadyWatchedOption.click();
+
+        // 5. Chờ 80ms rồi bấm nút "Gửi" / "Submit"
+        await new Promise(r => setTimeout(r, 80));
+        const allButtons = document.querySelectorAll(
+          'ytd-dismissal-follow-up-renderer button, ytd-dismissal-follow-up-renderer yt-button-shape button, [role="dialog"] button'
+        );
+        for (const b of allButtons) {
+          const text = (b.textContent || '').trim().toLowerCase();
+          if (text === 'gửi' || text === 'submit') {
+            b.click();
+            break;
+          }
+        }
+      }
+
+      return true;
+    } catch (err) {
+      console.warn('[Smart Nav] Gửi phản hồi đã xem tới YouTube:', err);
+      return false;
+    }
   }
 
   /**
@@ -408,6 +505,14 @@
       e.stopPropagation();
       e.stopImmediatePropagation();
 
+      const card = btn.closest(
+        'ytd-compact-video-renderer, ytd-compact-playlist-renderer, ytd-compact-radio-renderer, ' +
+        'ytd-playlist-panel-video-renderer, ytd-video-renderer, ytd-grid-video-renderer, ' +
+        'ytd-playlist-renderer, ytd-radio-renderer, ytd-rich-item-renderer, ytd-reel-item-renderer, ' +
+        'yt-shorts-item-view-model, ytd-rich-grid-shorts-renderer, yt-lockup-view-model, ytd-lockup-view-model, ' +
+        'div#dismissible, [class*="lockup"]'
+      ) || btn.parentElement;
+
       const rawHref = getLinkFromButtonContext(btn);
       if (!rawHref) {
         showToast('⚠️ Không tìm thấy link video để copy');
@@ -432,7 +537,12 @@
         if (iconCheck) iconCheck.style.display = 'inline-block';
         if (label) label.textContent = 'Đã copy!';
 
-        showToast(`📋 Đã copy link clip (Đã ghi nhận xem trên YouTube)`);
+        showToast(`📋 Đã copy link & Đã báo YouTube: Đã xem video này rồi!`);
+
+        // Tự động kích hoạt chuỗi phản hồi "Tôi đã xem video này rồi" tới YouTube
+        if (card) {
+          dismissVideoAsWatched(card);
+        }
 
         setTimeout(() => {
           btn.classList.remove('flash-copied');
@@ -1301,9 +1411,12 @@
               markVideoAsCopied(videoId);
             }
 
-            showToast(`📋 Đã copy link ${targetLabel}: ${cleanUrl}`);
+            showToast(`📋 Đã copy link ${targetLabel} & Đã báo YouTube: Đã xem!`);
             if (currentItems[currentIndex] && currentItems[currentIndex].element) {
-              const btn = currentItems[currentIndex].element.querySelector('.smart-nav-copy-btn');
+              const card = currentItems[currentIndex].element;
+              dismissVideoAsWatched(card);
+
+              const btn = card.querySelector('.smart-nav-copy-btn');
               if (btn) {
                 btn.classList.add('flash-copied');
                 setTimeout(() => {

@@ -20,36 +20,4 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({ success: true });
     return true;
   }
-
-  // Tự động ghi nhận video vào Lịch sử xem (Watch History) của YouTube
-  if (request.action === 'markAsWatchedOnYouTube' && request.videoId) {
-    const watchUrl = `https://www.youtube.com/watch?v=${encodeURIComponent(request.videoId)}&t=99999s`;
-    chrome.tabs.create({
-      url: watchUrl,
-      active: false // Chạy ngầm phía sau, không làm gián đoạn người dùng
-    }, (tab) => {
-      if (chrome.runtime.lastError || !tab) {
-        sendResponse({ success: false });
-        return;
-      }
-      try {
-        // Tắt tiếng tab ngầm để không phát ra âm thanh
-        chrome.tabs.update(tab.id, { muted: true }, () => {
-          if (chrome.runtime.lastError) {}
-        });
-      } catch (e) {}
-
-      // Giữ tab ngầm 2.5 giây để player YouTube nạp và gửi beacon ghi nhận lịch sử xem 100%
-      setTimeout(() => {
-        try {
-          chrome.tabs.remove(tab.id, () => {
-            if (chrome.runtime.lastError) {}
-          });
-        } catch (e) {}
-      }, 2500);
-    });
-
-    sendResponse({ success: true });
-    return true;
-  }
 });
