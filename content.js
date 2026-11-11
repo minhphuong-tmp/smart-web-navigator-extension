@@ -1026,6 +1026,285 @@
     });
   }
 
+  // ============================================================================
+  // PHẦN: TÍNH NĂNG COPY LINK VIDEO / REEL CHO TIKTOK (DÙNG CHO SKILL XEM VIDEO)
+  // ============================================================================
+
+  /**
+   * LÀM SẠCH VÀ CHUẨN HÓA LINK VIDEO / REEL / PHOTO TIKTOK
+   * (LOẠI BỎ TRACKING IS_FROM_WEBAPP, SENDER_DEVICE, WEB_ID, UTM...)
+   */
+  function getCleanTikTokUrl(rawUrl) {
+    if (!rawUrl) return '';
+    try {
+      const url = new URL(rawUrl, window.location.origin);
+
+      // 1. Dạng vt.tiktok.com hoặc vm.tiktok.com (link chia sẻ ngắn)
+      if (url.hostname.includes('vt.tiktok.com') || url.hostname.includes('vm.tiktok.com')) {
+        return `${url.origin}${url.pathname}`;
+      }
+
+      // 2. Dạng chuẩn @username/video/1234567890 hoặc @username/photo/1234567890
+      const standardMatch = url.pathname.match(/(@[^\/]+)\/(video|photo)\/(\d+)/);
+      if (standardMatch) {
+        return `https://www.tiktok.com/${standardMatch[1]}/${standardMatch[2]}/${standardMatch[3]}`;
+      }
+
+      // 3. Dạng /video/1234567890
+      const videoMatch = url.pathname.match(/\/video\/(\d+)/);
+      if (videoMatch) {
+        return `https://www.tiktok.com/video/${videoMatch[1]}`;
+      }
+
+      // 4. Dạng /photo/1234567890
+      const photoMatch = url.pathname.match(/\/photo\/(\d+)/);
+      if (photoMatch) {
+        return `https://www.tiktok.com/photo/${photoMatch[1]}`;
+      }
+
+      // 5. Query param item_id (ví dụ /foryou?item_id=1234567890)
+      if (url.searchParams.has('item_id')) {
+        const itemId = url.searchParams.get('item_id');
+        if (itemId) {
+          return `https://www.tiktok.com/video/${itemId}`;
+        }
+      }
+
+      // Xóa tất cả tham số tracking rác của TikTok
+      Array.from(url.searchParams.keys()).forEach(key => {
+        if (
+          [
+            'is_from_webapp', 'sender_device', 'web_id', '_r', 'share_app_id',
+            'share_item_id', 'share_link_id', 'source', 'ug_source', 'utm_source',
+            'utm_campaign', 'utm_medium', 'lang', 'enter_from', 'enter_method'
+          ].includes(key)
+        ) {
+          url.searchParams.delete(key);
+        }
+      });
+
+      const searchStr = url.searchParams.toString();
+      return url.origin + url.pathname + (searchStr ? `?${searchStr}` : '');
+    } catch (e) {
+      return rawUrl;
+    }
+  }
+
+  /**
+   * KIỂM TRA XEM URL CÓ PHẢI LÀ LINK VIDEO / REEL / PHOTO TIKTOK HỢP LỆ KHÔNG
+   */
+  function isValidTikTokVideoUrl(urlStr) {
+    if (!urlStr) return false;
+    try {
+      const u = new URL(urlStr, window.location.origin);
+      const p = u.pathname;
+
+      if (u.searchParams.has('item_id')) {
+        return true;
+      }
+
+      // Tuyệt đối không chấp nhận trang chủ hoặc fyp chung chung nếu không có video id
+      if (p === '/' || p === '' || p === '/foryou' || p === '/following' || p === '/live' || p === '/explore') {
+        return false;
+      }
+
+      if (p.includes('/video/') || p.includes('/photo/')) {
+        return true;
+      }
+
+      if ((u.hostname.includes('vt.tiktok.com') || u.hostname.includes('vm.tiktok.com')) && p.length > 2) {
+        return true;
+      }
+
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /**
+   * TÌM CONTAINER BAO QUÁT VIDEO PLAYER TRÊN TIKTOK
+   */
+  function findTikTokPlayerContainer(video) {
+    if (!video || !video.parentElement) return null;
+
+    // 1. Selector đặc trưng của TikTok (Feed item, Player container, Search card, Post item)
+    const knownContainer = video.closest(
+      '[data-e2e="recommend-list-item-container"], [data-e2e="feed-item"], [data-e2e="browse-video-container"], [data-e2e="user-post-item"], [data-e2e="search-card-video-container"], [data-e2e="search_video-item"], div[class*="DivVideoWrapper"], div[class*="DivPlayerContainer"], div[class*="DivBasicPlayerWrapper"], div[class*="DivVideoContainer"]'
+    );
+    if (knownContainer) return knownContainer;
+
+    // 2. Tìm thẻ cha có kích thước đủ lớn bao quanh video
+    let curr = video.parentElement;
+    let steps = 0;
+    while (curr && curr !== document.body && steps < 10) {
+      steps++;
+      if (curr.offsetHeight > 150 && curr.offsetWidth > 150) {
+        return curr;
+      }
+      curr = curr.parentElement;
+    }
+    return video.parentElement;
+  }
+
+  /**
+   * TÌM LINK GỐC CỦA VIDEO TRÊN TIKTOK TỪ THẺ VIDEO VÀ ANCESTOR DOM
+   */
+  function findTikTokVideoUrl(videoEl) {
+    // 1. Quét từ videoEl ngược lên các cấp cha để tìm link chứa /video/ hoặc /photo/
+    let curr = videoEl;
+    let steps = 0;
+    while (curr && curr !== document.body && steps < 20) {
+      steps++;
+      const directLink = curr.querySelector('a[href*="/video/"], a[href*="/photo/"]');
+      if (directLink && directLink.href && isValidTikTokVideoUrl(directLink.href)) {
+        return getCleanTikTokUrl(directLink.href);
+      }
+      curr = curr.parentElement;
+    }
+
+    // 2. Tìm trong container cha gần nhất (recommend item, feed item, search card)
+    const card = videoEl.closest(
+      '[data-e2e="recommend-list-item-container"], [data-e2e="feed-item"], [data-e2e="user-post-item"], [data-e2e="search-card-video-container"], [data-e2e="search_video-item"], div[class*="DivItemContainer"]'
+    );
+    if (card) {
+      const cardLink = card.querySelector('a[href*="/video/"], a[href*="/photo/"]');
+      if (cardLink && cardLink.href && isValidTikTokVideoUrl(cardLink.href)) {
+        return getCleanTikTokUrl(cardLink.href);
+      }
+    }
+
+    // 3. Nếu đang mở xem trực tiếp video (URL trình duyệt đang là link video / reel / photo)
+    if (isValidTikTokVideoUrl(window.location.href)) {
+      return getCleanTikTokUrl(window.location.href);
+    }
+
+    return null;
+  }
+
+  /**
+   * TẠO NÚT BẤM COPY LINK GẮN VÀO VIDEO TIKTOK
+   */
+  function createTikTokCopyButton(videoEl) {
+    const btn = document.createElement('button');
+    btn.className = 'smart-nav-tt-copy-btn';
+    btn.type = 'button';
+    btn.title = 'Sao chép link clip TikTok (Dùng cho skill xem video)';
+    btn.setAttribute('aria-label', 'Copy link clip TikTok');
+
+    btn.innerHTML = `
+      <svg class="icon-copy" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      <svg class="icon-check" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display: none;">
+        <polyline points="20 6 9 17 4 12"></polyline>
+      </svg>
+      <span class="smart-nav-tt-btn-label">Copy clip</span>
+    `;
+
+    let isCopying = false;
+    async function doCopy(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+      }
+      if (isCopying) return;
+      isCopying = true;
+      setTimeout(() => { isCopying = false; }, 800);
+
+      let rawUrl = findTikTokVideoUrl(videoEl);
+
+      // Nếu đang lướt Feed mà TikTok cập nhật URL theo vị trí cuộn:
+      if (!rawUrl || !isValidTikTokVideoUrl(rawUrl)) {
+        if (isValidTikTokVideoUrl(window.location.href)) {
+          rawUrl = window.location.href;
+        }
+      }
+
+      if (!rawUrl || !isValidTikTokVideoUrl(rawUrl)) {
+        showToast('⚠️ Không tìm thấy URL của clip TikTok này. Hãy click vào clip để mở xem rồi bấm Copy clip nhé!');
+        return;
+      }
+
+      const cleanUrl = getCleanTikTokUrl(rawUrl);
+      const success = await copyToClipboard(cleanUrl);
+
+      if (success) {
+        btn.classList.add('flash-copied');
+        const iconCopy = btn.querySelector('.icon-copy');
+        const iconCheck = btn.querySelector('.icon-check');
+        const label = btn.querySelector('.smart-nav-tt-btn-label');
+
+        if (iconCopy) iconCopy.style.display = 'none';
+        if (iconCheck) iconCheck.style.display = 'inline-block';
+        if (label) label.textContent = 'Đã copy!';
+
+        showToast('📋 Đã copy link clip TikTok! (Sẵn sàng gửi skill xem video)');
+
+        setTimeout(() => {
+          btn.classList.remove('flash-copied');
+          if (iconCopy) iconCopy.style.display = 'inline-block';
+          if (iconCheck) iconCheck.style.display = 'none';
+          if (label) label.textContent = 'Copy clip';
+        }, 1300);
+      } else {
+        showToast('⚠️ Không thể copy link vào clipboard');
+      }
+    }
+
+    // Chặn propagation các sự kiện chuột/pointer để TikTok không nhận diện là click vào player (gây pause hoặc phóng to)
+    ['pointerdown', 'mousedown', 'mouseup', 'pointerup'].forEach(evtType => {
+      btn.addEventListener(evtType, (e) => {
+        e.stopPropagation();
+      });
+    });
+
+    btn.addEventListener('click', doCopy);
+
+    return btn;
+  }
+
+  /**
+   * TỰ ĐỘNG QUÉT VÀ GẮN NÚT COPY CHO TẤT CẢ VIDEO TRÊN TIKTOK
+   */
+  function attachCopyButtonsToTikTok() {
+    if (!window.location.hostname.includes('tiktok.com')) return;
+
+    // 1. Quét các thẻ video trên TikTok
+    const videos = document.querySelectorAll('video');
+    videos.forEach(video => {
+      if (video.offsetWidth > 0 && video.offsetWidth < 120) return;
+      if (video.offsetHeight > 0 && video.offsetHeight < 80) return;
+
+      const container = findTikTokPlayerContainer(video);
+      if (!container) return;
+
+      if (container.querySelector('.smart-nav-tt-copy-btn')) return;
+
+      const computedPos = window.getComputedStyle(container).position;
+      if (computedPos === 'static') {
+        container.style.position = 'relative';
+      }
+
+      const btn = createTikTokCopyButton(video);
+      container.appendChild(btn);
+    });
+
+    // 2. Quét photo slideshows trên TikTok nếu có
+    const photoContainers = document.querySelectorAll('[data-e2e="browse-photo-container"], div[class*="DivPhotoCarousel"]');
+    photoContainers.forEach(container => {
+      if (container.querySelector('.smart-nav-tt-copy-btn')) return;
+      const computedPos = window.getComputedStyle(container).position;
+      if (computedPos === 'static') {
+        container.style.position = 'relative';
+      }
+      const btn = createTikTokCopyButton(container);
+      container.appendChild(btn);
+    });
+  }
+
   /**
    * Tạo hoặc lấy thẻ con trỏ chuyên dụng cho YouTube
    */
@@ -1434,6 +1713,9 @@
     if (window.location.hostname.includes('facebook.com')) {
       attachCopyButtonsToFacebook();
     }
+    if (window.location.hostname.includes('tiktok.com')) {
+      attachCopyButtonsToTikTok();
+    }
   }
 
   // Khởi tạo và tự động retry cho YouTube khi cột bên phải đang tải bất đồng bộ
@@ -1798,12 +2080,14 @@
       initYouTubeAutoRetry();
       attachCopyButtonsToYouTube();
       attachCopyButtonsToFacebook();
+      attachCopyButtonsToTikTok();
     });
   } else {
     init();
     initYouTubeAutoRetry();
     attachCopyButtonsToYouTube();
     attachCopyButtonsToFacebook();
+    attachCopyButtonsToTikTok();
   }
 
   // Lắng nghe sự kiện chuyển video trong YouTube (Single Page Application)
@@ -1826,6 +2110,9 @@
       if (window.location.hostname.includes('facebook.com')) {
         attachCopyButtonsToFacebook();
       }
+      if (window.location.hostname.includes('tiktok.com')) {
+        attachCopyButtonsToTikTok();
+      }
       const updated = scanPageItems();
       if (updated.length > 0 && (updated.length !== currentItems.length || pageMode === 'youtube')) {
         currentItems = updated;
@@ -1838,8 +2125,10 @@
 
   observer.observe(document.body, { childList: true, subtree: true });
 
-  // Lắng nghe sự kiện scroll trên Facebook để quét video mới tải khi cuộn
+  // Lắng nghe sự kiện scroll trên Facebook & TikTok để quét video mới tải khi cuộn
   let fbScrollTimer = null;
+  let ttScrollTimer = null;
+
   window.addEventListener('scroll', () => {
     if (window.location.hostname.includes('facebook.com')) {
       if (fbScrollTimer) clearTimeout(fbScrollTimer);
@@ -1847,12 +2136,39 @@
         attachCopyButtonsToFacebook();
       }, 350);
     }
+    if (window.location.hostname.includes('tiktok.com')) {
+      if (ttScrollTimer) clearTimeout(ttScrollTimer);
+      ttScrollTimer = setTimeout(() => {
+        attachCopyButtonsToTikTok();
+      }, 350);
+    }
   }, { passive: true });
 
-  // Lắng nghe thay đổi URL trong Facebook SPA (popstate)
+  // Lắng nghe sự kiện wheel & phím mũi tên trên TikTok (khi lướt Feed)
+  window.addEventListener('wheel', () => {
+    if (window.location.hostname.includes('tiktok.com')) {
+      if (ttScrollTimer) clearTimeout(ttScrollTimer);
+      ttScrollTimer = setTimeout(() => {
+        attachCopyButtonsToTikTok();
+      }, 400);
+    }
+  }, { passive: true });
+
+  window.addEventListener('keydown', (e) => {
+    if (window.location.hostname.includes('tiktok.com')) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        setTimeout(attachCopyButtonsToTikTok, 400);
+      }
+    }
+  }, { passive: true });
+
+  // Lắng nghe thay đổi URL trong Facebook & TikTok SPA (popstate)
   window.addEventListener('popstate', () => {
     if (window.location.hostname.includes('facebook.com')) {
       setTimeout(attachCopyButtonsToFacebook, 500);
+    }
+    if (window.location.hostname.includes('tiktok.com')) {
+      setTimeout(attachCopyButtonsToTikTok, 500);
     }
   });
 

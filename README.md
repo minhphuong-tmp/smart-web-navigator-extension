@@ -18,12 +18,17 @@
 - **Tương Thích Tuyệt Đối Với `skill xem video`:** Chỉ cần bấm nút copy trên Facebook, bạn có thể gửi ngay vào chat AI để bóc băng, tóm tắt hoặc xem nội dung video.
 - *(Lưu ý: Clip Facebook không gắn dấu tích đã xem, chỉ hỗ trợ copy link nhanh).*
 
-### 3. 💬 Diễn Đàn (Voz, Tinh tế, Reddit, XenForo, v.v.)
+### 3. 🎵 Copy Link Clip & Photo Trên TikTok (Dùng Cho AI Xem Video)
+- **Nút "Copy clip" Tự Động Gắn Trên Clip TikTok:** Hỗ trợ đầy đủ Bảng tin (FYP / For You feed), trang Cá nhân (Profile grid), Tìm kiếm (Search) và xem phóng to (Modal view).
+- **Làm Sạch Link Chuẩn Xác:** Loại bỏ toàn bộ tham số tracking rác của TikTok (`is_from_webapp`, `sender_device`, `web_id`, `_r`, `utm_source`...) để trả về URL video sạch dạng `https://www.tiktok.com/@username/video/ID` (hoặc `/photo/ID`).
+- **Tối Ưu Trải Nghiệm:** Tự động cập nhật URL khi cuộn lướt video trên feed, không làm ngắt quãng video hay vô tình bấm nhầm vào player.
+
+### 4. 💬 Diễn Đàn (Voz, Tinh tế, Reddit, XenForo, v.v.)
 - **Phím [Tab] / [Shift + Tab]:** Nhảy nhanh qua từng bài viết hoặc bình luận kế tiếp.
 - **Phím [Enter]:** Mở bài viết / link trong **Tab mới chạy ngầm (active = false)**, không làm gián đoạn trang đang đọc.
 - **Phím [Shift + Mũi tên Phải/Trái]:** Chuyển trang tiếp theo / trang trước liền mạch.
 
-### 3. 🔍 Google Search
+### 5. 🔍 Google Search
 - Điều hướng các kết quả tìm kiếm bằng bàn phím tiện lợi, mở kết quả trong tab ngầm.
 
 ---

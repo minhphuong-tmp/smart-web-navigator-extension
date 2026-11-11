@@ -379,3 +379,71 @@ html:not([dark]) .smart-nav-watch-copy-btn:hover {
   pointer-events: none !important;
   letter-spacing: 0.2px !important;
 }
+
+/* --------------------------------------------------------------------------
+   7. NÚT COPY LINK VIDEO CHO TIKTOK (FYP FEED, PROFILE, SEARCH, MODAL)
+   -------------------------------------------------------------------------- */
+.smart-nav-tt-copy-btn {
+  position: absolute !important;
+  top: 14px !important;
+  left: 14px !important;
+  z-index: 2147483647 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  padding: 4px 10px !important;
+  height: 28px !important;
+  box-sizing: border-box !important;
+  background: rgba(18, 18, 24, 0.88) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  border-radius: 6px !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  opacity: 0.92 !important;
+  transition: all 0.16s ease-in-out !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45) !important;
+  user-select: none !important;
+  pointer-events: auto !important;
+  outline: none !important;
+}
+
+.smart-nav-tt-copy-btn:hover {
+  opacity: 1 !important;
+  background: #fe2c55 !important; /* TikTok Red/Pink Accent */
+  border-color: #ff3b5c !important;
+  color: #ffffff !important;
+  transform: scale(1.06) !important;
+  box-shadow: 0 3px 14px rgba(254, 44, 85, 0.55) !important;
+}
+
+.smart-nav-tt-copy-btn:active {
+  transform: scale(0.95) !important;
+}
+
+.smart-nav-tt-copy-btn.flash-copied {
+  background: #00c853 !important;
+  border-color: #00e676 !important;
+  color: #ffffff !important;
+  opacity: 1 !important;
+  transform: scale(1.06) !important;
+  box-shadow: 0 0 14px rgba(0, 200, 83, 0.7) !important;
+}
+
+.smart-nav-tt-copy-btn svg {
+  display: block !important;
+  flex-shrink: 0 !important;
+  pointer-events: none !important;
+}
+
+.smart-nav-tt-copy-btn span {
+  display: inline-block !important;
+  pointer-events: none !important;
+  letter-spacing: 0.2px !important;
+}
