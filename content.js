@@ -1149,33 +1149,105 @@
   }
 
   /**
+   * TRÍCH XUẤT VIDEO ID & AUTHOR TỪ REACT FIBER HOẶC DOM DATA CỦA TIKTOK
+   */
+  function getTikTokDataFromFiber(domElement) {
+    if (!domElement) return null;
+    let node = domElement;
+    let steps = 0;
+    while (node && node !== document.body && steps < 12) {
+      steps++;
+      const fiberKey = Object.keys(node).find(
+        key => key.startsWith('__reactFiber$') || key.startsWith('__reactInternalInstance$') || key.startsWith('__reactProps$')
+      );
+      if (fiberKey) {
+        let fiber = node[fiberKey];
+        let depth = 0;
+        while (fiber && depth < 30) {
+          const props = fiber.memoizedProps || fiber;
+          if (props) {
+            // Kiểm tra các thuộc tính phổ biến chứa video struct trong React của TikTok
+            const itemStruct = props.itemInfo?.itemStruct || props.itemStruct || props.aweme || props.item || props.videoData || props.data;
+            const rawId = props.awemeId || props.videoId || props.id || (itemStruct && (itemStruct.id || itemStruct.aweme_id));
+            if (rawId) {
+              const idMatch = String(rawId).match(/(\d{16,22})/);
+              if (idMatch) {
+                const author = props.author?.uniqueId ||
+                               itemStruct?.author?.uniqueId ||
+                               props.uniqueId ||
+                               itemStruct?.author?.nickname;
+                return {
+                  id: idMatch[1],
+                  author: author ? `@${author.replace(/^@/, '')}` : ''
+                };
+              }
+            }
+          }
+          fiber = fiber.return;
+          depth++;
+        }
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  /**
    * TÌM LINK GỐC CỦA VIDEO TRÊN TIKTOK TỪ THẺ VIDEO VÀ ANCESTOR DOM
    */
   function findTikTokVideoUrl(videoEl) {
-    // 1. Quét từ videoEl ngược lên các cấp cha để tìm link chứa /video/ hoặc /photo/
-    let curr = videoEl;
+    if (!videoEl) return null;
+
+    // 1. Tìm thẻ Card bao bọc RIÊNG video này (feed-item, recommend-list-item, user-post-item)
+    const card = videoEl.closest(
+      '[data-e2e="recommend-list-item-container"], [data-e2e="feed-item"], [data-e2e="user-post-item"], [data-e2e="search-card-video-container"], [data-e2e="search_video-item"], [data-e2e="browse-video-container"], [class*="ItemContainer"], [class*="item-container"], article'
+    );
+
+    // 2. Tìm link video trực tiếp NẰM BÊN TRONG CARD này (TUYỆT ĐỐI không quét ra ngoài card)
+    if (card) {
+      const cardLinks = card.querySelectorAll('a[href*="/video/"], a[href*="/photo/"]');
+      for (const a of cardLinks) {
+        if (a.href && isValidTikTokVideoUrl(a.href)) {
+          return getCleanTikTokUrl(a.href);
+        }
+      }
+
+      // 3. Quét ID từ các thuộc tính ID / data-* bên trong card
+      const idMatch = (card.id && card.id.match(/(\d{16,22})/)) ||
+                      (card.getAttribute('data-id') && card.getAttribute('data-id').match(/(\d{16,22})/));
+      if (idMatch) {
+        const authorLink = card.querySelector('a[href^="/@"], [data-e2e="video-author-uniqueid"], [data-e2e="video-author-avatar"]');
+        let authorPart = '';
+        if (authorLink) {
+          const uMatch = (authorLink.href || authorLink.textContent || '').match(/(@[a-zA-Z0-9._-]+)/);
+          if (uMatch) authorPart = `${uMatch[1]}/`;
+        }
+        return `https://www.tiktok.com/${authorPart}video/${idMatch[1]}`;
+      }
+    }
+
+    // 4. Trích xuất trực tiếp từ React Fiber của chính video hoặc card
+    const fiberData = getTikTokDataFromFiber(videoEl) || (card ? getTikTokDataFromFiber(card) : null);
+    if (fiberData && fiberData.id) {
+      const authorPart = fiberData.author ? `${fiberData.author}/` : '';
+      return `https://www.tiktok.com/${authorPart}video/${fiberData.id}`;
+    }
+
+    // 5. Quét từ videoEl ngược lên các cấp cha (nhưng DỪNG LẠI tại card để không bao giờ ăn sang video khác)
+    let curr = videoEl.parentElement;
     let steps = 0;
-    while (curr && curr !== document.body && steps < 20) {
-      steps++;
+    while (curr && curr !== document.body && steps < 8) {
+      if (card && curr === card.parentElement) break; // Dừng ngay lập tức nếu vượt ra ngoài card!
       const directLink = curr.querySelector('a[href*="/video/"], a[href*="/photo/"]');
       if (directLink && directLink.href && isValidTikTokVideoUrl(directLink.href)) {
         return getCleanTikTokUrl(directLink.href);
       }
+      if (curr === card) break;
       curr = curr.parentElement;
+      steps++;
     }
 
-    // 2. Tìm trong container cha gần nhất (recommend item, feed item, search card)
-    const card = videoEl.closest(
-      '[data-e2e="recommend-list-item-container"], [data-e2e="feed-item"], [data-e2e="user-post-item"], [data-e2e="search-card-video-container"], [data-e2e="search_video-item"], div[class*="DivItemContainer"]'
-    );
-    if (card) {
-      const cardLink = card.querySelector('a[href*="/video/"], a[href*="/photo/"]');
-      if (cardLink && cardLink.href && isValidTikTokVideoUrl(cardLink.href)) {
-        return getCleanTikTokUrl(cardLink.href);
-      }
-    }
-
-    // 3. Nếu đang mở xem trực tiếp video (URL trình duyệt đang là link video / reel / photo)
+    // 6. Nếu người dùng đang mở xem chi tiết video (URL trình duyệt đang là link video)
     if (isValidTikTokVideoUrl(window.location.href)) {
       return getCleanTikTokUrl(window.location.href);
     }
@@ -2061,17 +2133,22 @@
 
       const videos = Array.from(document.querySelectorAll('video'));
       if (videos.length > 0) {
-        // Ưu tiên video đang phát (không bị paused)
-        const playing = videos.find(v => !v.paused && v.currentTime > 0);
-        if (playing) {
-          activeVideo = playing;
-        } else {
-          // Hoặc video nằm gần giữa màn hình nhất
-          const center = window.innerHeight / 2;
-          let bestDist = Infinity;
-          for (const v of videos) {
-            const r = v.getBoundingClientRect();
-            if (r.height > 100) {
+        // Lọc các video đang thực sự hiển thị trong viewport màn hình
+        const viewportVideos = videos.filter(v => {
+          const r = v.getBoundingClientRect();
+          return r.height >= 100 && r.bottom > 100 && r.top < window.innerHeight - 100;
+        });
+
+        if (viewportVideos.length > 0) {
+          // 1. Ưu tiên video đang phát (không bị paused và currentTime > 0)
+          activeVideo = viewportVideos.find(v => !v.paused && v.currentTime > 0);
+
+          // 2. Nếu không có video nào đang chạy, lấy video nằm gần trung tâm màn hình nhất
+          if (!activeVideo) {
+            const center = window.innerHeight / 2;
+            let bestDist = Infinity;
+            for (const v of viewportVideos) {
+              const r = v.getBoundingClientRect();
               const dist = Math.abs((r.top + r.bottom) / 2 - center);
               if (dist < bestDist) {
                 bestDist = dist;
@@ -2079,6 +2156,11 @@
               }
             }
           }
+        }
+
+        // 3. Fallback nếu không có video trong viewport
+        if (!activeVideo) {
+          activeVideo = videos.find(v => !v.paused) || videos[0];
         }
       }
 
