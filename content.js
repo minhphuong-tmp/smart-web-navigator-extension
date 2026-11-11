@@ -1149,38 +1149,57 @@
   }
 
   /**
-   * TRÍCH XUẤT VIDEO ID & AUTHOR TỪ REACT FIBER HOẶC DOM DATA CỦA TIKTOK
+   * TRÍCH XUẤT VIDEO ID & AUTHOR TỪ REACT FIBER CỦA TIKTOK (CÓ KIỂM SOÁT PHẠM VI)
    */
-  function getTikTokDataFromFiber(domElement) {
+  function getTikTokDataFromFiber(domElement, expectedAuthor = null) {
     if (!domElement) return null;
     let node = domElement;
     let steps = 0;
-    while (node && node !== document.body && steps < 12) {
-      steps++;
+
+    // Chỉ tìm tối đa 3 cấp DOM cha gần sát, TUYỆT ĐỐI không leo lên container cấp feed/body
+    while (node && steps < 3 && node !== document.body) {
       const fiberKey = Object.keys(node).find(
         key => key.startsWith('__reactFiber$') || key.startsWith('__reactInternalInstance$') || key.startsWith('__reactProps$')
       );
       if (fiberKey) {
         let fiber = node[fiberKey];
         let depth = 0;
-        while (fiber && depth < 30) {
+        // Chỉ leo tối đa 6 cấp fiber để không bao giờ chạm tới FeedList hay root #app
+        while (fiber && depth < 6) {
           const props = fiber.memoizedProps || fiber;
           if (props) {
-            // Kiểm tra các thuộc tính phổ biến chứa video struct trong React của TikTok
-            const itemStruct = props.itemInfo?.itemStruct || props.itemStruct || props.aweme || props.item || props.videoData || props.data;
-            const rawId = props.awemeId || props.videoId || props.id || (itemStruct && (itemStruct.id || itemStruct.aweme_id));
-            if (rawId) {
-              const idMatch = String(rawId).match(/(\d{16,22})/);
-              if (idMatch) {
-                const author = props.author?.uniqueId ||
-                               itemStruct?.author?.uniqueId ||
-                               props.uniqueId ||
-                               itemStruct?.author?.nickname;
+            const itemStruct = props.itemInfo?.itemStruct || props.itemStruct || props.aweme || props.item || props.videoData;
+            if (itemStruct && !Array.isArray(itemStruct)) {
+              const rawId = itemStruct.id || itemStruct.aweme_id || itemStruct.itemId;
+              if (rawId && String(rawId).match(/^\d{16,22}$/)) {
+                const author = itemStruct.author?.uniqueId || itemStruct.author?.nickname || props.author?.uniqueId || '';
+                const cleanAuthor = author ? `@${author.replace(/^@/, '')}` : '';
+
+                // Nếu có expectedAuthor từ Card, BẮT BUỘC author phải khớp để tránh nhầm clip khác!
+                if (expectedAuthor && cleanAuthor && !expectedAuthor.toLowerCase().includes(cleanAuthor.toLowerCase()) && !cleanAuthor.toLowerCase().includes(expectedAuthor.toLowerCase())) {
+                  fiber = fiber.return;
+                  depth++;
+                  continue;
+                }
+
                 return {
-                  id: idMatch[1],
-                  author: author ? `@${author.replace(/^@/, '')}` : ''
+                  id: String(rawId),
+                  author: cleanAuthor
                 };
               }
+            }
+
+            if (props.awemeId && String(props.awemeId).match(/^\d{16,22}$/)) {
+              const author = props.author?.uniqueId ? `@${props.author.uniqueId}` : '';
+              if (expectedAuthor && author && !expectedAuthor.toLowerCase().includes(author.toLowerCase())) {
+                fiber = fiber.return;
+                depth++;
+                continue;
+              }
+              return {
+                id: String(props.awemeId),
+                author: author
+              };
             }
           }
           fiber = fiber.return;
@@ -1188,6 +1207,7 @@
         }
       }
       node = node.parentElement;
+      steps++;
     }
     return null;
   }
@@ -1198,16 +1218,30 @@
   function findTikTokVideoUrl(videoEl) {
     if (!videoEl) return null;
 
-    // 1. Tìm thẻ Card bao bọc RIÊNG video này (feed-item, recommend-list-item, user-post-item)
+    // 1. Tìm thẻ Card bao bọc RIÊNG video này
     const card = videoEl.closest(
       '[data-e2e="recommend-list-item-container"], [data-e2e="feed-item"], [data-e2e="user-post-item"], [data-e2e="search-card-video-container"], [data-e2e="search_video-item"], [data-e2e="browse-video-container"], [class*="ItemContainer"], [class*="item-container"], article'
     );
 
-    // 2. Tìm link video trực tiếp NẰM BÊN TRONG CARD này (TUYỆT ĐỐI không quét ra ngoài card)
+    // Xác định tên kênh tác giả (author handle) từ thẻ Card này
+    let expectedAuthor = '';
+    if (card) {
+      const authorLink = card.querySelector('a[href*="/@"]');
+      if (authorLink && authorLink.href) {
+        const uMatch = authorLink.href.match(/(@[a-zA-Z0-9._-]+)/);
+        if (uMatch) expectedAuthor = uMatch[1];
+      }
+    }
+
+    // 2. Tìm link video trực tiếp NẰM BÊN TRONG CARD này
     if (card) {
       const cardLinks = card.querySelectorAll('a[href*="/video/"], a[href*="/photo/"]');
       for (const a of cardLinks) {
         if (a.href && isValidTikTokVideoUrl(a.href)) {
+          // Nếu có expectedAuthor, kiểm tra link có chứa đúng author không
+          if (expectedAuthor && !a.href.includes(expectedAuthor)) {
+            continue;
+          }
           return getCleanTikTokUrl(a.href);
         }
       }
@@ -1215,41 +1249,23 @@
       // 3. Quét ID từ các thuộc tính ID / data-* bên trong card
       const idMatch = (card.id && card.id.match(/(\d{16,22})/)) ||
                       (card.getAttribute('data-id') && card.getAttribute('data-id').match(/(\d{16,22})/));
-      if (idMatch) {
-        const authorLink = card.querySelector('a[href^="/@"], [data-e2e="video-author-uniqueid"], [data-e2e="video-author-avatar"]');
-        let authorPart = '';
-        if (authorLink) {
-          const uMatch = (authorLink.href || authorLink.textContent || '').match(/(@[a-zA-Z0-9._-]+)/);
-          if (uMatch) authorPart = `${uMatch[1]}/`;
-        }
-        return `https://www.tiktok.com/${authorPart}video/${idMatch[1]}`;
+      if (idMatch && expectedAuthor) {
+        return `https://www.tiktok.com/${expectedAuthor}/video/${idMatch[1]}`;
       }
     }
 
-    // 4. Trích xuất trực tiếp từ React Fiber của chính video hoặc card
-    const fiberData = getTikTokDataFromFiber(videoEl) || (card ? getTikTokDataFromFiber(card) : null);
+    // 4. Trích xuất an toàn từ React Fiber của chính video hoặc card với kiểm tra expectedAuthor
+    const fiberData = getTikTokDataFromFiber(videoEl, expectedAuthor) || (card ? getTikTokDataFromFiber(card, expectedAuthor) : null);
     if (fiberData && fiberData.id) {
-      const authorPart = fiberData.author ? `${fiberData.author}/` : '';
+      const authorPart = (fiberData.author || expectedAuthor) ? `${fiberData.author || expectedAuthor}/` : '';
       return `https://www.tiktok.com/${authorPart}video/${fiberData.id}`;
     }
 
-    // 5. Quét từ videoEl ngược lên các cấp cha (nhưng DỪNG LẠI tại card để không bao giờ ăn sang video khác)
-    let curr = videoEl.parentElement;
-    let steps = 0;
-    while (curr && curr !== document.body && steps < 8) {
-      if (card && curr === card.parentElement) break; // Dừng ngay lập tức nếu vượt ra ngoài card!
-      const directLink = curr.querySelector('a[href*="/video/"], a[href*="/photo/"]');
-      if (directLink && directLink.href && isValidTikTokVideoUrl(directLink.href)) {
-        return getCleanTikTokUrl(directLink.href);
-      }
-      if (curr === card) break;
-      curr = curr.parentElement;
-      steps++;
-    }
-
-    // 6. Nếu người dùng đang mở xem chi tiết video (URL trình duyệt đang là link video)
+    // 5. Nếu URL trình duyệt đang xem là link video cụ thể và khớp author (hoặc không ở trang feed chung)
     if (isValidTikTokVideoUrl(window.location.href)) {
-      return getCleanTikTokUrl(window.location.href);
+      if (!expectedAuthor || window.location.href.includes(expectedAuthor)) {
+        return getCleanTikTokUrl(window.location.href);
+      }
     }
 
     return null;
@@ -1289,7 +1305,30 @@
 
       let rawUrl = findTikTokVideoUrl(videoEl);
 
-      // Nếu đang lướt Feed mà TikTok cập nhật URL theo vị trí cuộn:
+      // Nếu đang lướt Feed mà TikTok giấu URL:
+      // Tự động kích hoạt nút comment hoặc video để router TikTok cập nhật window.location sang /@username/video/ID
+      if (!rawUrl || !isValidTikTokVideoUrl(rawUrl)) {
+        try {
+          const card = videoEl.closest(
+            '[data-e2e="recommend-list-item-container"], [data-e2e="feed-item"], [data-e2e="user-post-item"], [class*="ItemContainer"], article'
+          );
+          if (card) {
+            const commentBtn = card.querySelector('[data-e2e="comment-icon"], button[aria-label*="Bình luận"], button[aria-label*="Comment"]');
+            if (commentBtn) {
+              commentBtn.click();
+              await new Promise(r => setTimeout(r, 300));
+              if (isValidTikTokVideoUrl(window.location.href)) {
+                rawUrl = window.location.href;
+                const closeBtn = document.querySelector('[data-e2e="comment-close"], [data-e2e="close-icon"], button[aria-label*="Close"], button[aria-label*="Đóng"]');
+                if (closeBtn) closeBtn.click();
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('[Smart Nav] Tự động kích hoạt router TikTok thất bại:', err);
+        }
+      }
+
       if (!rawUrl || !isValidTikTokVideoUrl(rawUrl)) {
         if (isValidTikTokVideoUrl(window.location.href)) {
           rawUrl = window.location.href;
@@ -2164,17 +2203,39 @@
         }
       }
 
-      if (activeVideo) {
-        targetUrl = findTikTokVideoUrl(activeVideo);
-      }
+      (async () => {
+        if (activeVideo) {
+          targetUrl = findTikTokVideoUrl(activeVideo);
+        }
 
-      if (!targetUrl && isValidTikTokVideoUrl(window.location.href)) {
-        targetUrl = window.location.href;
-      }
+        // Nếu chưa lấy được URL từ Card, kích hoạt mở comment panel để TikTok router cập nhật URL sang /video/ID
+        if ((!targetUrl || !isValidTikTokVideoUrl(targetUrl)) && activeVideo) {
+          try {
+            const card = activeVideo.closest(
+              '[data-e2e="recommend-list-item-container"], [data-e2e="feed-item"], [data-e2e="user-post-item"], [class*="ItemContainer"], article'
+            );
+            if (card) {
+              const commentBtn = card.querySelector('[data-e2e="comment-icon"], button[aria-label*="Bình luận"], button[aria-label*="Comment"]');
+              if (commentBtn) {
+                commentBtn.click();
+                await new Promise(r => setTimeout(r, 300));
+                if (isValidTikTokVideoUrl(window.location.href)) {
+                  targetUrl = window.location.href;
+                  const closeBtn = document.querySelector('[data-e2e="comment-close"], [data-e2e="close-icon"], button[aria-label*="Close"], button[aria-label*="Đóng"]');
+                  if (closeBtn) closeBtn.click();
+                }
+              }
+            }
+          } catch (err) {}
+        }
 
-      if (targetUrl) {
-        const cleanUrl = getCleanTikTokUrl(targetUrl);
-        copyToClipboard(cleanUrl).then(success => {
+        if (!targetUrl && isValidTikTokVideoUrl(window.location.href)) {
+          targetUrl = window.location.href;
+        }
+
+        if (targetUrl) {
+          const cleanUrl = getCleanTikTokUrl(targetUrl);
+          const success = await copyToClipboard(cleanUrl);
           if (success) {
             showToast('📋 Đã copy link clip TikTok! [Phím C] (Sẵn sàng gửi skill xem video)');
             if (activeVideo) {
@@ -2193,10 +2254,10 @@
           } else {
             showToast('⚠️ Không thể copy link vào clipboard');
           }
-        });
-      } else {
-        showToast('⚠️ Chưa phát hiện link clip TikTok. Hãy click vào clip rồi bấm phím C nhé!');
-      }
+        } else {
+          showToast('⚠️ Chưa phát hiện link clip TikTok. Hãy click vào clip rồi bấm phím C nhé!');
+        }
+      })();
       return;
     }
 
