@@ -14,11 +14,13 @@
 
 ### 2. 📱 Copy Link Clip & Reel Trên Facebook (Dùng Cho AI Xem Video)
 - **Nút "Copy clip" Gắn Trên Mọi Video:** Tự động phát hiện video, Reels, video trong bài viết Feed, nhóm hoặc trang Facebook và hiển thị nút copy nhỏ gọn ở góc trên clip.
+- **Phím Tắt [c]:** Bấm phím `c` trên bàn phím để copy ngay link clip Facebook đang xem mà không cần rê chuột!
 - **Chuẩn Hóa Link Tự Động:** Loại bỏ toàn bộ các tham số tracking rác của Facebook (`fbclid`, `mibextid`, `__tn__`...) để trả về link video chuẩn xác nhất (`facebook.com/reel/ID` hoặc `facebook.com/watch/?v=ID`).
 - **Tương Thích Tuyệt Đối Với `skill xem video`:** Chỉ cần bấm nút copy trên Facebook, bạn có thể gửi ngay vào chat AI để bóc băng, tóm tắt hoặc xem nội dung video.
 - *(Lưu ý: Clip Facebook không gắn dấu tích đã xem, chỉ hỗ trợ copy link nhanh).*
 
 ### 3. 🎵 Copy Link Clip & Photo Trên TikTok (Dùng Cho AI Xem Video)
+- **Phím Tắt [c] Tiện Lợi:** Đang lướt video trên TikTok, chỉ cần ấn phím `c` trên bàn phím là tiện ích tự động copy ngay URL sạch của video đang phát!
 - **Nút "Copy clip" Tự Động Gắn Trên Clip TikTok:** Hỗ trợ đầy đủ Bảng tin (FYP / For You feed), trang Cá nhân (Profile grid), Tìm kiếm (Search) và xem phóng to (Modal view).
 - **Làm Sạch Link Chuẩn Xác:** Loại bỏ toàn bộ tham số tracking rác của TikTok (`is_from_webapp`, `sender_device`, `web_id`, `_r`, `utm_source`...) để trả về URL video sạch dạng `https://www.tiktok.com/@username/video/ID` (hoặc `/photo/ID`).
 - **Tối Ưu Trải Nghiệm:** Tự động cập nhật URL khi cuộn lướt video trên feed, không làm ngắt quãng video hay vô tình bấm nhầm vào player.

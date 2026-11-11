@@ -1128,22 +1128,23 @@
   function findTikTokPlayerContainer(video) {
     if (!video || !video.parentElement) return null;
 
-    // 1. Selector đặc trưng của TikTok (Feed item, Player container, Search card, Post item)
-    const knownContainer = video.closest(
-      '[data-e2e="recommend-list-item-container"], [data-e2e="feed-item"], [data-e2e="browse-video-container"], [data-e2e="user-post-item"], [data-e2e="search-card-video-container"], [data-e2e="search_video-item"], div[class*="DivVideoWrapper"], div[class*="DivPlayerContainer"], div[class*="DivBasicPlayerWrapper"], div[class*="DivVideoContainer"]'
+    // 1. Ưu tiên tìm container bọc sát video nhất (Player Wrapper / DivVideoWrapper / DivPlayerContainer / DivBasicPlayerWrapper)
+    const tightWrapper = video.closest(
+      'div[class*="DivVideoWrapper"], div[class*="DivPlayerContainer"], div[class*="DivBasicPlayerWrapper"], div[class*="DivVideoContainer"], div[class*="DivVideoItemContainer"], [data-e2e="browse-video-container"], [data-e2e="search-card-video-container"]'
     );
-    if (knownContainer) return knownContainer;
+    if (tightWrapper) return tightWrapper;
 
-    // 2. Tìm thẻ cha có kích thước đủ lớn bao quanh video
+    // 2. Tìm thẻ cha trực tiếp hoặc gần sát có kích thước bao quanh video nhưng không phải feed container quá rộng
     let curr = video.parentElement;
     let steps = 0;
-    while (curr && curr !== document.body && steps < 10) {
+    while (curr && curr !== document.body && steps < 6) {
       steps++;
-      if (curr.offsetHeight > 150 && curr.offsetWidth > 150) {
+      if (curr.offsetHeight >= 150 && curr.offsetWidth >= 150) {
         return curr;
       }
       curr = curr.parentElement;
     }
+
     return video.parentElement;
   }
 
@@ -2048,6 +2049,138 @@
         });
         return;
       }
+    }
+
+    // 7. PHÍM 'c' / 'C': Sao chép nhanh link clip TikTok
+    if ((key === 'c' || key === 'C') && !isTyping && window.location.hostname.includes('tiktok.com')) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      let targetUrl = null;
+      let activeVideo = null;
+
+      const videos = Array.from(document.querySelectorAll('video'));
+      if (videos.length > 0) {
+        // Ưu tiên video đang phát (không bị paused)
+        const playing = videos.find(v => !v.paused && v.currentTime > 0);
+        if (playing) {
+          activeVideo = playing;
+        } else {
+          // Hoặc video nằm gần giữa màn hình nhất
+          const center = window.innerHeight / 2;
+          let bestDist = Infinity;
+          for (const v of videos) {
+            const r = v.getBoundingClientRect();
+            if (r.height > 100) {
+              const dist = Math.abs((r.top + r.bottom) / 2 - center);
+              if (dist < bestDist) {
+                bestDist = dist;
+                activeVideo = v;
+              }
+            }
+          }
+        }
+      }
+
+      if (activeVideo) {
+        targetUrl = findTikTokVideoUrl(activeVideo);
+      }
+
+      if (!targetUrl && isValidTikTokVideoUrl(window.location.href)) {
+        targetUrl = window.location.href;
+      }
+
+      if (targetUrl) {
+        const cleanUrl = getCleanTikTokUrl(targetUrl);
+        copyToClipboard(cleanUrl).then(success => {
+          if (success) {
+            showToast('📋 Đã copy link clip TikTok! [Phím C] (Sẵn sàng gửi skill xem video)');
+            if (activeVideo) {
+              const container = findTikTokPlayerContainer(activeVideo);
+              const btn = container ? container.querySelector('.smart-nav-tt-copy-btn') : null;
+              if (btn) {
+                btn.classList.add('flash-copied');
+                const label = btn.querySelector('.smart-nav-tt-btn-label');
+                if (label) label.textContent = 'Đã copy!';
+                setTimeout(() => {
+                  btn.classList.remove('flash-copied');
+                  if (label) label.textContent = 'Copy clip';
+                }, 1300);
+              }
+            }
+          } else {
+            showToast('⚠️ Không thể copy link vào clipboard');
+          }
+        });
+      } else {
+        showToast('⚠️ Chưa phát hiện link clip TikTok. Hãy click vào clip rồi bấm phím C nhé!');
+      }
+      return;
+    }
+
+    // 8. PHÍM 'c' / 'C': Sao chép nhanh link clip Facebook
+    if ((key === 'c' || key === 'C') && !isTyping && window.location.hostname.includes('facebook.com')) {
+      e.preventDefault();
+      e.stopPropagation();
+
+      let targetUrl = null;
+      let activeVideo = null;
+
+      const videos = Array.from(document.querySelectorAll('video'));
+      if (videos.length > 0) {
+        const playing = videos.find(v => !v.paused && v.currentTime > 0);
+        if (playing) {
+          activeVideo = playing;
+        } else {
+          const center = window.innerHeight / 2;
+          let bestDist = Infinity;
+          for (const v of videos) {
+            const r = v.getBoundingClientRect();
+            if (r.height > 100) {
+              const dist = Math.abs((r.top + r.bottom) / 2 - center);
+              if (dist < bestDist) {
+                bestDist = dist;
+                activeVideo = v;
+              }
+            }
+          }
+        }
+      }
+
+      if (activeVideo) {
+        targetUrl = findFacebookVideoUrl(activeVideo);
+      }
+
+      if (!targetUrl && isValidFacebookVideoUrl(window.location.href)) {
+        targetUrl = window.location.href;
+      }
+
+      if (targetUrl) {
+        const cleanUrl = getCleanFacebookUrl(targetUrl);
+        copyToClipboard(cleanUrl).then(success => {
+          if (success) {
+            showToast('📋 Đã copy link clip Facebook! [Phím C] (Sẵn sàng gửi skill xem video)');
+            if (activeVideo) {
+              const container = findFacebookPlayerContainer(activeVideo);
+              const btn = container ? container.querySelector('.smart-nav-fb-copy-btn') : null;
+              if (btn) {
+                btn.classList.add('flash-copied');
+                const label = btn.querySelector('.smart-nav-fb-btn-label');
+                if (label) label.textContent = 'Đã copy!';
+                setTimeout(() => {
+                  btn.classList.remove('flash-copied');
+                  if (label) label.textContent = 'Copy clip';
+                }, 1300);
+              }
+            }
+          } else {
+            showToast('⚠️ Không thể copy link vào clipboard');
+          }
+        });
+      } else {
+        showToast('⚠️ Chưa phát hiện link clip Facebook. Hãy click vào clip rồi bấm phím C nhé!');
+      }
+      return;
     }
   }, true);
 
